@@ -1,0 +1,2 @@
+---
+- import_playbook: domain-controller.yml

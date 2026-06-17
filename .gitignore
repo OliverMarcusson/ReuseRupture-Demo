@@ -1,0 +1,30 @@
+# Large downloaded media (~21 GB)
+*.iso
+iso/
+server2025_eval.iso
+win2k25_updates.iso
+
+# Virtualenvs / build caches
+.venv-samr/
+.venv/
+venv/
+wheelhouse/
+.cache/
+
+# Vagrant / libvirt state
+.vagrant/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Generated run output
+evidence/
+
+# Local config + generated inventory (contain demo creds + flag)
+config.yml
+inventory/hosts.yml
+inventory/group_vars/all.yml
+
+# Course assignment brief (third-party contact details)
+EP284U Instruktions.txt

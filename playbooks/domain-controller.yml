@@ -1,0 +1,6 @@
+---
+- name: Configure ReuseRupture domain controller
+  hosts: domain_controller
+  gather_facts: false
+  roles:
+    - domain_controller

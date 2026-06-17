@@ -1,0 +1,176 @@
+---
+- name: Gather Windows facts
+  ansible.windows.setup:
+
+- name: Ensure demo directory exists
+  ansible.windows.win_file:
+    path: C:\ReuseRuptureDemo
+    state: directory
+
+- name: Disable crash recovery screen so DC reboots unattended after exploit
+  ansible.windows.win_powershell:
+    script: |
+      bcdedit /set "{default}" recoveryenabled no | Out-Null
+      bcdedit /set "{default}" bootstatuspolicy ignoreallfailures | Out-Null
+      $cc = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+      Set-ItemProperty -Path $cc -Name AutoReboot     -Value 1 -Type DWord
+      Set-ItemProperty -Path $cc -Name CrashDumpEnabled -Value 3 -Type DWord
+      $Ansible.Changed = $true
+
+- name: Rename computer when needed
+  ansible.windows.win_hostname:
+    name: "{{ rr.windows.hostname }}"
+  register: rename_result
+
+- name: Reboot after rename
+  ansible.windows.win_reboot:
+    reboot_timeout: 900
+  when: rename_result.reboot_required
+
+- name: Configure static IPv4 address
+  ansible.windows.win_powershell:
+    script: |
+      $alias = "{{ rr.windows.interface_alias }}"
+      $ip = "{{ rr.windows.ip }}"
+      $prefix = {{ rr.network.prefix }}
+      $gateway = "{{ rr.network.gateway }}"
+      $existing = Get-NetIPAddress -InterfaceAlias $alias -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -eq $ip }
+      if (-not $existing) {
+        Get-NetIPAddress -InterfaceAlias $alias -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+          Where-Object { $_.PrefixOrigin -ne "WellKnown" } |
+          Remove-NetIPAddress -Confirm:$false -ErrorAction SilentlyContinue
+        New-NetIPAddress -InterfaceAlias $alias -IPAddress $ip -PrefixLength $prefix -DefaultGateway $gateway
+        $Ansible.Changed = $true
+      }
+      Set-DnsClientServerAddress -InterfaceAlias $alias -ServerAddresses $ip
+
+- name: Check whether AD DS and DNS features are already installed
+  ansible.windows.win_powershell:
+    script: |
+      $features = Get-WindowsFeature AD-Domain-Services, DNS
+      $Ansible.Result = @{ installed = ($features | Where-Object { -not $_.Installed }).Count -eq 0 }
+  register: features_check
+
+- name: Install AD DS and DNS features
+  ansible.windows.win_feature:
+    name:
+      - AD-Domain-Services
+      - DNS
+    include_management_tools: true
+    state: present
+  register: add_features
+  when: not (features_check.result.installed | default(false))
+
+- name: Check whether forest already exists
+  ansible.windows.win_powershell:
+    script: |
+      try {
+        $domain = Get-ADDomain -ErrorAction Stop
+        $Ansible.Result = @{ exists = $true; dns_root = $domain.DNSRoot }
+      } catch {
+        $Ansible.Result = @{ exists = $false }
+      }
+  register: forest_check
+  failed_when: false
+
+- name: Create Active Directory forest
+  microsoft.ad.domain:
+    dns_domain_name: "{{ rr.active_directory.domain_name }}"
+    domain_netbios_name: "{{ rr.active_directory.netbios_name }}"
+    safe_mode_password: "{{ rr.active_directory.administrator_password }}"
+    reboot: true
+  no_log: true
+  when: not (forest_check.result.exists | default(false))
+  register: domain_create
+
+- name: Wait for domain services after promotion
+  ansible.windows.win_reboot:
+    reboot_timeout: 1200
+  when: domain_create is changed
+
+- name: Ensure demo domain user exists
+  microsoft.ad.user:
+    identity: "{{ rr.active_directory.demo_username }}"
+    name: "{{ rr.active_directory.demo_username }}"
+    firstname: Demo
+    surname: User
+    password: "{{ rr.active_directory.demo_password }}"
+    enabled: true
+    state: present
+    update_password: on_create
+  no_log: true
+
+- name: Ensure AS-REP roastable user exists
+  microsoft.ad.user:
+    identity: "{{ rr.active_directory.asrep_username }}"
+    name: "{{ rr.active_directory.asrep_username }}"
+    firstname: Legacy
+    surname: User
+    password: "{{ rr.active_directory.asrep_password }}"
+    enabled: true
+    state: present
+    update_password: on_create
+  no_log: true
+
+- name: Disable Kerberos preauthentication for legacy user
+  ansible.windows.win_powershell:
+    script: |
+      Import-Module ActiveDirectory
+      $user = Get-ADUser -Identity "{{ rr.active_directory.asrep_username }}" -Properties DoesNotRequirePreAuth
+      if (-not $user.DoesNotRequirePreAuth) {
+        Set-ADAccountControl -Identity "{{ rr.active_directory.asrep_username }}" -DoesNotRequirePreAuth $true
+        $Ansible.Changed = $true
+      }
+
+- name: Allow outbound to flag listener so domain firewall profile cannot block it
+  community.windows.win_firewall_rule:
+    name: ReuseRupture Flag Listener Outbound
+    action: allow
+    direction: out
+    remoteip: "{{ rr.flag.listener_ip }}"
+    remoteport: "{{ rr.flag.listener_port }}"
+    protocol: tcp
+    state: present
+    enabled: true
+
+- name: Copy flag callback script
+  ansible.windows.win_copy:
+    src: "{{ playbook_dir }}/../flag/send-flag.ps1"
+    dest: C:\ReuseRuptureDemo\send-flag.ps1
+
+- name: Copy flag task installer
+  ansible.windows.win_copy:
+    src: "{{ playbook_dir }}/../flag/install-flag-task.ps1"
+    dest: C:\ReuseRuptureDemo\install-flag-task.ps1
+
+- name: Install startup flag scheduled task
+  ansible.windows.win_powershell:
+    script: |
+      C:\ReuseRuptureDemo\install-flag-task.ps1 `
+        -InstallDir "C:\ReuseRuptureDemo" `
+        -Flag "{{ rr.flag.value }}" `
+        -ListenerIp "{{ rr.flag.listener_ip }}" `
+        -ListenerPort {{ rr.flag.listener_port }} `
+        -StartupDelaySeconds {{ rr.flag.startup_delay_seconds }} `
+        -RetryCount {{ rr.flag.retry_count }} `
+        -RetryDelaySeconds {{ rr.flag.retry_delay_seconds }}
+
+- name: Install diagnostic helper
+  ansible.windows.win_copy:
+    dest: C:\ReuseRuptureDemo\diagnostics.ps1
+    content: |
+      Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsBuildNumber
+      Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 20
+      Get-ScheduledTask -TaskName "ReuseRupture Flag Callback"
+
+- name: Print Windows version and hotfix summary
+  ansible.windows.win_powershell:
+    script: |
+      $info = Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsBuildNumber
+      $hotfixes = Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 10 HotFixID, InstalledOn
+      $Ansible.Result = @{ computer_info = $info; hotfixes = $hotfixes }
+  register: version_summary
+
+- name: Show Windows diagnostic summary
+  ansible.builtin.debug:
+    var: version_summary.result

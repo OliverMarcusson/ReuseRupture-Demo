@@ -1,0 +1,65 @@
+hypervisor: libvirt
+
+network:
+  name: reuserupture-net
+  subnet: 192.168.56.0/24
+  gateway: 192.168.56.1
+  netmask: 255.255.255.0
+  prefix: 24
+
+windows:
+  vm_name: reuserupture-dc
+  hostname: DC01
+  ip: 192.168.56.10
+  iso_path: iso/windows-server-2025-eval.iso
+  download_iso: true
+  iso_url: https://drive.google.com/file/d/15D3YaClnwR221122uNCwLenRPZpqIk_k/view?usp=sharing
+  # Optional but recommended: set this after the first trusted download.
+  iso_sha256: ""
+  edition: Windows Server 2025 Standard Evaluation (Desktop Experience)
+  interface_alias: Ethernet
+  username: Administrator
+  memory_mb: auto
+  vcpus: auto
+  disk_gb: 80
+  winrm_port: 5986
+  vagrant_box: ""
+  virtio:
+    enabled: true
+    iso_path: iso/virtio-win.iso
+    download_iso: true
+    iso_url: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
+    iso_sha256: ""
+    driver_folders:
+      - 2k25
+      - 2k22
+      - w11
+      - w10
+
+attacker:
+  container_name: reuserupture-attacker
+  hostname: ATTACKER01
+  workdir: /opt/reuserupture
+
+active_directory:
+  domain_name: reuserupture.local
+  netbios_name: REUSERUPTURE
+  administrator_password: ChangeMe-Admin-2026!
+  demo_username: demo-user
+  demo_password: DemoUser-2026!
+  asrep_username: legacy-user
+  asrep_password: Password123!
+
+flag:
+  value: EP284U{REUSERUPTURE_DC_REBOOT_CONFIRMED}
+  listener_ip: 192.168.56.1
+  listener_port: 8080
+  startup_delay_seconds: 20
+  retry_count: 20
+  retry_delay_seconds: 10
+
+demo:
+  evidence_root: evidence
+  snapshot_name: reuserupture-ready
+  capture_packets: false
+  reboot_timeout_seconds: 900

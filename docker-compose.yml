@@ -1,0 +1,17 @@
+services:
+  attacker:
+    build:
+      context: .
+      dockerfile: docker/attacker/Dockerfile
+    container_name: reuserupture-attacker
+    hostname: ATTACKER01
+    network_mode: host
+    working_dir: /opt/reuserupture
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/opt/reuserupture
+      - ./evidence:/opt/reuserupture/evidence
+    environment:
+      PYTHONUNBUFFERED: "1"
+    command: sleep infinity

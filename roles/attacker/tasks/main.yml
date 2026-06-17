@@ -1,0 +1,137 @@
+---
+- name: Set attacker hostname
+  ansible.builtin.hostname:
+    name: "{{ rr.kali.hostname }}"
+  become: true
+
+- name: Install attacker packages
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-venv
+      - python3-pip
+      - git
+      - tmux
+      - curl
+      - jq
+      - ncat
+      - hashcat
+      - krb5-user
+      - dnsutils
+      - impacket-scripts
+      - tcpdump
+      - tshark
+      - net-tools
+    state: present
+    update_cache: true
+  become: true
+  register: attacker_packages
+  failed_when: false
+
+- name: Report package install issues without stopping minimal demos
+  ansible.builtin.debug:
+    msg: "Some optional Kali packages were not installed: {{ attacker_packages.msg | default('unknown apt issue') }}"
+  when: attacker_packages is failed
+
+- name: Add fallback DC host entries
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "{{ rr.windows.ip }} {{ rr.windows.hostname }} {{ rr.windows.hostname }}.{{ rr.active_directory.domain_name }}"
+    regexp: "^{{ rr.windows.ip | regex_escape() }}\\s+"
+  become: true
+
+- name: Create ReuseRupture directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ rr.kali.username }}"
+    group: "{{ rr.kali.username }}"
+    mode: "0755"
+  loop:
+    - /opt/reuserupture
+    - /opt/reuserupture/tool
+    - /opt/reuserupture/flag
+    - /opt/reuserupture/scripts
+    - /opt/reuserupture/wordlists
+    - /opt/reuserupture/evidence
+    - /opt/reuserupture/wheelhouse
+    - /opt/reuserupture/wheelhouse/tool
+  become: true
+
+- name: Copy merged ReuseRupture tool
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../tool/"
+    dest: /opt/reuserupture/tool/
+    owner: "{{ rr.kali.username }}"
+    group: "{{ rr.kali.username }}"
+    mode: preserve
+  become: true
+
+- name: Copy flag listener
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../flag/"
+    dest: /opt/reuserupture/flag/
+    owner: "{{ rr.kali.username }}"
+    group: "{{ rr.kali.username }}"
+    mode: preserve
+  become: true
+
+- name: Copy demo scripts
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../scripts/"
+    dest: /opt/reuserupture/scripts/
+    owner: "{{ rr.kali.username }}"
+    group: "{{ rr.kali.username }}"
+    mode: preserve
+  become: true
+
+- name: Copy demo wordlist
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../wordlists/"
+    dest: /opt/reuserupture/wordlists/
+    owner: "{{ rr.kali.username }}"
+    group: "{{ rr.kali.username }}"
+    mode: preserve
+  become: true
+
+- name: Copy offline Python wheelhouse
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../wheelhouse/tool/"
+    dest: /opt/reuserupture/wheelhouse/tool/
+    owner: "{{ rr.kali.username }}"
+    group: "{{ rr.kali.username }}"
+    mode: preserve
+  become: true
+
+- name: Create tool virtual environment
+  ansible.builtin.command:
+    cmd: python3 -m venv /opt/reuserupture/.venv
+    creates: /opt/reuserupture/.venv/bin/python
+  become: true
+
+- name: Install Python tool dependencies
+  ansible.builtin.pip:
+    requirements: /opt/reuserupture/tool/requirements.txt
+    virtualenv: /opt/reuserupture/.venv
+    extra_args: "--no-index --find-links /opt/reuserupture/wheelhouse/tool"
+  become: true
+
+- name: Install convenience launcher
+  ansible.builtin.copy:
+    dest: /usr/local/bin/reuserupture
+    mode: "0755"
+    content: |
+      #!/usr/bin/env bash
+      exec /opt/reuserupture/.venv/bin/python /opt/reuserupture/tool/reuserupture.py "$@"
+  become: true
+
+- name: Check DNS resolution for domain controller
+  ansible.builtin.command:
+    cmd: "getent hosts {{ rr.windows.hostname }}.{{ rr.active_directory.domain_name }}"
+  register: dns_check
+  changed_when: false
+  failed_when: false
+
+- name: Report DNS check
+  ansible.builtin.debug:
+    var: dns_check.stdout
