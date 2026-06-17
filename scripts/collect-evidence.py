@@ -7,7 +7,7 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
-from rrlib import ROOT, attacker_exec, load_config, redacted_config_json, render_inventory, run
+from rrlib import ROOT, attacker_exec, ensure_repo_writable_dir, load_config, redacted_config_json, render_inventory, run
 
 
 def main() -> int:
@@ -20,6 +20,14 @@ def main() -> int:
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
+    if not output_dir.is_absolute():
+        output_dir = ROOT / output_dir
+    try:
+        output_dir.resolve().relative_to(ROOT)
+    except ValueError:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        ensure_repo_writable_dir(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     render_inventory()
     (output_dir / "config.redacted.json").write_text(redacted_config_json(), encoding="utf-8")

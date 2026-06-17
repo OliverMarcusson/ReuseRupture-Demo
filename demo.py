@@ -17,6 +17,7 @@ from scripts.rrlib import (
     banner,
     container_path,
     demo_auth_target,
+    ensure_repo_writable_dir,
     info,
     load_config,
     ok,
@@ -86,7 +87,9 @@ def dc_powershell_lines(script: str) -> list[str]:
 
 
 def prepare_evidence_dir(config: dict, run_id: str) -> Path:
-    evidence_dir = ROOT / config["demo"]["evidence_root"] / utc_stamp()
+    evidence_root = ROOT / config["demo"]["evidence_root"]
+    ensure_repo_writable_dir(evidence_root)
+    evidence_dir = evidence_root / utc_stamp()
     evidence_dir.mkdir(parents=True, exist_ok=True)
     (evidence_dir / "run-id.txt").write_text(run_id + "\n", encoding="utf-8")
     (evidence_dir / "config.redacted.json").write_text(redacted_config_json(), encoding="utf-8")

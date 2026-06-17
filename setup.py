@@ -18,6 +18,7 @@ from scripts.rrlib import (
     docker_compose,
     download_url,
     ensure_config_exists,
+    ensure_repo_writable_dir,
     info,
     load_config,
     ok,
@@ -172,6 +173,16 @@ def ensure_virtio_iso() -> None:
     ok(f"VirtIO ISO downloaded: {iso}")
 
 
+def prepare_workspace_dirs() -> None:
+    cfg = load_config()
+    step("Preparing writable workspace directories")
+    ensure_repo_writable_dir(ROOT / cfg["demo"]["evidence_root"])
+    ensure_repo_writable_dir(ROOT / "inventory")
+    ensure_repo_writable_dir(ROOT / "inventory/group_vars")
+    ensure_repo_writable_dir(ROOT / "iso")
+    ok("Workspace directories are writable")
+
+
 def start_docker_services() -> None:
     if not shutil.which("systemctl"):
         return
@@ -295,6 +306,7 @@ def main() -> int:
 
     banner("ReuseRupture Lab Setup", "This prepares the VMs, Active Directory, attack tooling, and flag callback.")
     ensure_config_exists()
+    prepare_workspace_dirs()
     install_host_dependencies()
     start_docker_services()
     start_libvirt_services()

@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from rrlib import ROOT, attacker_cmd, container_path, load_config, run
+from rrlib import ROOT, attacker_cmd, container_path, ensure_repo_writable_dir, load_config, run
 
 
 def main() -> int:
@@ -20,7 +20,7 @@ def main() -> int:
     evidence_dir = Path(args.evidence_dir) if args.evidence_dir else evidence_root / "manual-listener"
     if not evidence_dir.is_absolute():
         evidence_dir = ROOT / evidence_dir
-    evidence_dir.mkdir(parents=True, exist_ok=True)
+    ensure_repo_writable_dir(evidence_dir)
 
     return run(
         attacker_cmd(

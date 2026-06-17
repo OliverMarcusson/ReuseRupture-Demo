@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
-from rrlib import ROOT, attacker_cmd, container_path, load_config, run, utc_stamp
+from rrlib import ROOT, attacker_cmd, container_path, ensure_repo_writable_dir, load_config, run, utc_stamp
 
 
 def main() -> int:
     config = load_config()
-    evidence_dir = ROOT / config["demo"]["evidence_root"] / f"asrep-{utc_stamp()}"
+    evidence_root = ROOT / config["demo"]["evidence_root"]
+    ensure_repo_writable_dir(evidence_root)
+    evidence_dir = evidence_root / f"asrep-{utc_stamp()}"
     evidence_dir.mkdir(parents=True, exist_ok=True)
 
     asrep_output = evidence_dir / "asrep.txt"

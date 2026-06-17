@@ -67,6 +67,45 @@ def run(cmd: list[str], *, check: bool = True, cwd: Path | None = None, capture:
     return subprocess.run(full, **kwargs)  # type: ignore[arg-type]
 
 
+def invoking_uid_gid() -> tuple[str, str]:
+    """Return the real user's uid/gid, even when a script was launched by sudo."""
+    return (
+        os.environ.get("SUDO_UID") or str(os.getuid()),
+        os.environ.get("SUDO_GID") or str(os.getgid()),
+    )
+
+
+def ensure_repo_writable_dir(path: Path) -> None:
+    """Create a repo-local directory and repair common sudo ownership drift.
+
+    Fresh Ubuntu installs often need sudo for Docker/libvirt until group
+    membership has been applied. That can leave bind-mounted generated
+    directories such as evidence/, inventory/, or iso/ owned by root, causing
+    the next non-sudo run to fail with PermissionError. Limit the repair to
+    paths inside this repository.
+    """
+    path = path.resolve()
+    try:
+        path.relative_to(ROOT)
+    except ValueError as exc:
+        raise SystemExit(f"Refusing to repair permissions outside the repo: {path}") from exc
+
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        test = path / ".rr-write-test"
+        test.write_text("", encoding="utf-8")
+        test.unlink(missing_ok=True)
+        return
+    except OSError:
+        uid, gid = invoking_uid_gid()
+        run(["mkdir", "-p", str(path)], sudo=True)
+        run(["chown", "-R", f"{uid}:{gid}", str(path)], sudo=True)
+        path.mkdir(parents=True, exist_ok=True)
+        test = path / ".rr-write-test"
+        test.write_text("", encoding="utf-8")
+        test.unlink(missing_ok=True)
+
+
 def command_exists(name: str) -> bool:
     return shutil.which(name) is not None
 
@@ -145,7 +184,12 @@ def sha256_file(path: Path) -> str:
 
 
 def download_url(url: str, output: Path, expected_sha256: str = "") -> None:
-    output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        output.parent.resolve().relative_to(ROOT)
+    except ValueError:
+        output.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        ensure_repo_writable_dir(output.parent)
     tmp = output.with_suffix(output.suffix + ".part")
     downloader = ["curl", "-L", "--fail", "--progress-bar", "-o", str(tmp), url]
     if command_exists("aria2c"):
@@ -189,7 +233,8 @@ def cfg_path(value: str) -> Path:
 
 def render_inventory() -> None:
     step("Rendering Ansible inventory from config.yml")
-    (ROOT / "inventory/group_vars").mkdir(parents=True, exist_ok=True)
+    ensure_repo_writable_dir(ROOT / "inventory")
+    ensure_repo_writable_dir(ROOT / "inventory/group_vars")
     inventory = run([str(ROOT / "scripts/render-config.py"), "--config", str(CONFIG_FILE), "--format", "inventory", "--validate"], capture=True)
     (ROOT / "inventory/hosts.yml").write_text(inventory.stdout, encoding="utf-8")
     all_vars = run([str(ROOT / "scripts/render-config.py"), "--config", str(CONFIG_FILE), "--format", "all-vars", "--validate"], capture=True)
