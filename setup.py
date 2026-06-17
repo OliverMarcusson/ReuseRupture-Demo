@@ -181,38 +181,60 @@ def start_docker_services() -> None:
     ok("Docker service startup attempted")
 
 
+def docker_group_members() -> set[str]:
+    """Return the set of users listed in the `docker` group (from /etc/group)."""
+    result = run(["getent", "group", "docker"], check=False, capture=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        return set()
+    # getent format: docker:x:999:user1,user2
+    return {m for m in result.stdout.strip().split(":")[-1].split(",") if m}
+
+
 def ensure_docker_access() -> None:
-    """Give the current user direct access to the Docker daemon socket.
+    """Make sure the invoking user can use Docker without sudo.
 
     A fresh Docker install leaves the user outside the `docker` group, so the
     unprivileged client hits 'permission denied' on the socket. We add the user
-    to the group, but that does not affect the already-running process, so we
-    re-exec setup once under `sg docker` to pick up the membership immediately —
-    avoiding both a re-login and a fragile sudo-for-Docker path (where sudo's
-    cached credentials expire during the long image build and the next Docker
-    call blocks waiting for a password).
+    and *verify* the membership actually stuck (the add can silently no-op if the
+    group is missing or sudo fails). Group changes do not affect already-running
+    sessions, and on Ubuntu logging out and back in is frequently not enough —
+    the graphical/systemd user session lingers — so a reboot is the reliable
+    way to apply it. For the current run we re-exec once under `sg docker` so
+    setup proceeds without sudo or any re-login.
     """
     if not shutil.which("docker"):
         return
+
+    user = os.environ.get("SUDO_USER") or getpass.getuser()
+
+    if user not in docker_group_members():
+        step(f"Adding {user} to the 'docker' group")
+        run(["groupadd", "-f", "docker"], check=False, sudo=True)
+        run(["usermod", "-aG", "docker", user], check=False, sudo=True)
+        if user not in docker_group_members():
+            warn(f"Could not add {user} to the 'docker' group. Configure Docker access manually:")
+            warn(f"  sudo groupadd -f docker && sudo usermod -aG docker {user}")
+            return
+        ok(f"{user} added to the 'docker' group")
+        warn("REBOOT to use Docker as your user. Logging out and back in is often NOT")
+        warn("enough on Ubuntu; a reboot reliably applies the new group membership.")
+
+    # Membership is set in /etc/group. If this process can already reach the
+    # daemon, nothing more is needed.
     if run(["docker", "info"], check=False, capture=True).returncode == 0:
         return
 
-    user = os.environ.get("SUDO_USER") or getpass.getuser()
-    step(f"Granting {user} access to the Docker daemon")
-    run(["usermod", "-aG", "docker", user], check=False, sudo=True)
-
-    # Re-exec once under the docker group so the rest of the run uses Docker
-    # directly. The env flag prevents an infinite re-exec loop.
+    # Not active in this session yet. Re-exec once under the group so this run
+    # works now. The env flag prevents an infinite re-exec loop.
     if os.environ.get("RR_DOCKER_GROUP_REEXEC") != "1" and shutil.which("sg"):
-        info("Re-running setup under the 'docker' group (via sg docker)")
+        info("Applying the 'docker' group for this run (via sg docker)")
         inner = shlex.join([sys.executable, *sys.argv])
         os.execvp("sg", ["sg", "docker", "-c", f"RR_DOCKER_GROUP_REEXEC=1 exec {inner}"])
 
     # Fallback: no `sg`, or the re-exec did not gain access. Docker calls use
-    # sudo automatically this run (see rrlib.docker_prefix); the group applies
-    # fully after the next login.
-    warn(f"Added {user} to the 'docker' group. Log out and back in (or run 'newgrp docker')")
-    warn("to use Docker without sudo. This run falls back to sudo for Docker.")
+    # sudo automatically this run (see rrlib.docker_prefix).
+    warn("Docker group membership is set but not active in this session;")
+    warn("this run falls back to sudo for Docker. Reboot to avoid this next time.")
 
 
 def prepare_attacker_container() -> None:
