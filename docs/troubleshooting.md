@@ -4,6 +4,22 @@
 
 Enable VT-x/AMD-V in firmware. Check `lsmod | grep kvm` and `virsh list`.
 
+## Docker Permission Denied
+
+```text
+permission denied while trying to connect to the Docker daemon socket
+```
+
+A fresh Docker install leaves your user outside the `docker` group. `setup.py`
+adds you automatically and falls back to `sudo` for Docker during the run, so
+setup still completes. To use Docker without `sudo` afterwards, start a new
+login session (or run `newgrp docker`) so the new group membership applies:
+
+```bash
+sudo usermod -aG docker "$USER"   # setup.py already does this
+newgrp docker                     # or log out and back in
+```
+
 ## Libvirt Bridge Permission Errors
 
 If setup fails with:

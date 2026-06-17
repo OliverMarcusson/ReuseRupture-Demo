@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import getpass
+import os
 import shutil
 import subprocess
 
@@ -173,7 +175,28 @@ def start_docker_services() -> None:
         return
     step("Starting Docker service")
     run(["systemctl", "enable", "--now", "docker.service"], check=False, sudo=True)
+    ensure_docker_access()
     ok("Docker service startup attempted")
+
+
+def ensure_docker_access() -> None:
+    """Give the current user access to the Docker daemon socket.
+
+    A fresh Docker install leaves the user outside the `docker` group, so the
+    unprivileged client hits 'permission denied' on the socket. Add the user to
+    the group for future sessions; the current run uses sudo for Docker
+    automatically (see rrlib.docker_prefix) since group changes only apply after
+    the next login.
+    """
+    if not shutil.which("docker"):
+        return
+    if run(["docker", "info"], check=False, capture=True).returncode == 0:
+        return
+    user = os.environ.get("SUDO_USER") or getpass.getuser()
+    step(f"Granting {user} access to the Docker daemon")
+    run(["usermod", "-aG", "docker", user], check=False, sudo=True)
+    warn(f"Added {user} to the 'docker' group. Log out and back in (or run 'newgrp docker')")
+    warn("to use Docker without sudo. This setup run will use sudo for Docker automatically.")
 
 
 def prepare_attacker_container() -> None:

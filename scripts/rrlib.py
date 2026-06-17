@@ -80,12 +80,36 @@ def require_cmds(commands: Iterable[str]) -> bool:
     return ok
 
 
+_docker_sudo: bool | None = None
+
+
+def docker_prefix() -> list[str]:
+    """Command prefix that lets docker reach the daemon socket.
+
+    On a fresh install the user is not yet in the ``docker`` group, so the
+    unprivileged client gets the classic "permission denied" on the socket.
+    When that happens we fall back to ``sudo`` (if it can reach the daemon) so
+    the current run still works; group membership only takes effect after the
+    user logs in again. The decision is cached for the process.
+    """
+    global _docker_sudo
+    if _docker_sudo is None:
+        if not command_exists("docker"):
+            _docker_sudo = False
+        elif run(["docker", "info"], check=False, capture=True).returncode == 0:
+            _docker_sudo = False
+        else:
+            _docker_sudo = run(["sudo", "docker", "info"], check=False, capture=True).returncode == 0
+    return ["sudo"] if _docker_sudo else []
+
+
 def docker_compose_base() -> list[str]:
-    if command_exists("docker") and run(["docker", "compose", "version"], check=False, capture=True).returncode == 0:
-        return ["docker", "compose"]
+    prefix = docker_prefix()
+    if command_exists("docker") and run([*prefix, "docker", "compose", "version"], check=False, capture=True).returncode == 0:
+        return [*prefix, "docker", "compose"]
     if command_exists("docker-compose"):
-        return ["docker-compose"]
-    return ["docker", "compose"]
+        return [*prefix, "docker-compose"]
+    return [*prefix, "docker", "compose"]
 
 
 def docker_compose(args: list[str], *, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
