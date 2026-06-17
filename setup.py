@@ -29,7 +29,7 @@ from scripts.rrlib import (
 # installation entirely.
 REQUIRED_COMMANDS = [
     "python3", "pip3", "ansible", "ansible-galaxy", "ansible-playbook",
-    "docker", "virsh", "virt-install", "virt-xml", "qemu-img", "vagrant",
+    "docker", "virsh", "virt-install", "virt-xml", "qemu-img",
     "curl", "sha256sum", "xorriso", "cpio", "gzip", "aria2c",
 ]
 
@@ -55,8 +55,7 @@ PACKAGE_MANAGERS = {
             ("freerdp3-x11", "freerdp2-x11"), "gzip", "libvirt-clients",
             "libvirt-daemon-system", "python3", "python3-pip", "python3-winrm",
             "python3-yaml", ("qemu-system-x86", "qemu-kvm"), "qemu-utils",
-            "sshpass", "vagrant", "vagrant-libvirt", "virtinst", "xorriso",
-            "aria2",
+            "sshpass", "virtinst", "xorriso", "aria2",
         ],
     },
     "dnf": {
@@ -67,8 +66,8 @@ PACKAGE_MANAGERS = {
             "ansible", "coreutils", "cpio", "curl", "docker",
             ("docker-compose", "docker-compose-plugin"), "freerdp", "gzip",
             "libvirt", "python3", "python3-pip", "python3-winrm",
-            "python3-PyYAML", "qemu-img", "qemu-kvm", "sshpass", "vagrant",
-            "vagrant-libvirt", "virt-install", "xorriso", "aria2",
+            "python3-PyYAML", "qemu-img", "qemu-kvm", "sshpass",
+            "virt-install", "xorriso", "aria2",
         ],
     },
     "pacman": {
@@ -79,8 +78,7 @@ PACKAGE_MANAGERS = {
             "ansible", "coreutils", "cpio", "curl", "docker", "docker-compose",
             "freerdp", "gzip", "libvirt", "libvirt-glib", "make", "gcc",
             "python", "python-pip", "python-pywinrm", "python-yaml",
-            "qemu-desktop", "sshpass", "vagrant", "vagrant-libvirt",
-            "virt-install", "xorriso", "aria2",
+            "qemu-desktop", "sshpass", "virt-install", "xorriso", "aria2",
         ],
     },
 }
@@ -206,22 +204,6 @@ def start_libvirt_services() -> None:
     ok("Libvirt service startup attempted")
 
 
-def ensure_vagrant_libvirt_provider() -> None:
-    step("Checking Vagrant libvirt provider")
-    result = run(["vagrant", "plugin", "list"], check=False, capture=True)
-    if result.returncode == 0 and "vagrant-libvirt" in result.stdout:
-        ok("Vagrant libvirt provider is installed")
-        return
-
-    step("Installing Vagrant libvirt provider")
-    install = run(["vagrant", "plugin", "install", "vagrant-libvirt"], check=False)
-    if install.returncode != 0:
-        warn("Could not install vagrant-libvirt automatically.")
-        warn("Install the distro package or run: vagrant plugin install vagrant-libvirt")
-        raise SystemExit(install.returncode)
-    ok("Vagrant libvirt provider installed")
-
-
 def wait_for_management_services() -> int:
     step("Waiting for VM management services")
     checks = [
@@ -255,7 +237,6 @@ def main() -> int:
     install_host_dependencies()
     start_docker_services()
     start_libvirt_services()
-    ensure_vagrant_libvirt_provider()
 
     if args.verify_only:
         step("Verify-only mode selected")

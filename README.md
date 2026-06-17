@@ -27,7 +27,7 @@ NetBIOS:    REUSERUPTURE
 
 ## Prerequisites
 
-Supported reference host path: Linux with Docker, libvirt/KVM, Vagrant, and
+Supported reference host path: Linux with Docker, libvirt/KVM, and
 `virt-install`.
 
 You need:

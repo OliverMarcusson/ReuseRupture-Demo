@@ -23,7 +23,6 @@ windows:
   vcpus: auto
   disk_gb: 80
   winrm_port: 5986
-  vagrant_box: ""
   virtio:
     enabled: true
     iso_path: iso/virtio-win.iso
