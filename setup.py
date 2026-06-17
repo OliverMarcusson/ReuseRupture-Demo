@@ -54,7 +54,7 @@ PACKAGE_MANAGERS = {
         "install": ["apt-get", "install", "-y"],
         "available": ["apt-cache", "show"],
         "packages": [
-            "ansible", "coreutils", "cpio", "curl", "docker.io",
+            "acl", "ansible", "coreutils", "cpio", "curl", "docker.io",
             ("docker-compose-v2", "docker-compose-plugin", "docker-compose"),
             ("freerdp3-x11", "freerdp2-x11"), "gzip", "libvirt-clients",
             "libvirt-daemon-system", "python3", "python3-pip", "python3-winrm",
@@ -67,7 +67,7 @@ PACKAGE_MANAGERS = {
         "install": ["dnf", "install", "-y"],
         "available": ["dnf", "list"],
         "packages": [
-            "ansible", "coreutils", "cpio", "curl", "docker",
+            "acl", "ansible", "coreutils", "cpio", "curl", "docker",
             ("docker-compose", "docker-compose-plugin"), "freerdp", "gzip",
             "libvirt", "python3", "python3-pip", "python3-winrm",
             "python3-PyYAML", "qemu-img", "qemu-kvm", "sshpass",
@@ -79,7 +79,7 @@ PACKAGE_MANAGERS = {
         "install": ["pacman", "-S", "--needed", "--noconfirm"],
         "available": ["pacman", "-Si"],
         "packages": [
-            "ansible", "coreutils", "cpio", "curl", "docker", "docker-compose",
+            "acl", "ansible", "coreutils", "cpio", "curl", "docker", "docker-compose",
             "freerdp", "gzip", "libvirt", "libvirt-glib", "make", "gcc",
             "python", "python-pip", "python-pywinrm", "python-yaml",
             "qemu-desktop", "sshpass", "virt-install", "xorriso", "aria2",

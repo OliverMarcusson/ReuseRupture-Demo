@@ -80,6 +80,23 @@ On Debian systems using monolithic libvirt, this is usually:
 sudo systemctl enable --now libvirtd
 ```
 
+## QEMU Cannot Open The ISO (Permission Denied)
+
+```text
+Could not open '/home/<user>/.../iso/...': Permission denied
+```
+
+Under `qemu:///system`, Debian/Ubuntu run QEMU as the unprivileged
+`libvirt-qemu` user, which cannot traverse a `0750` home directory to read VM
+media stored there. `create-windows.py` grants that user the minimal ACLs it
+needs (traverse on the parent directories, read on the ISO) using `setfacl`, so
+the `acl` package must be installed. To grant access manually:
+
+```bash
+sudo setfacl -m u:libvirt-qemu:x /home /home/<user> /home/<user>/ReuseRupture-Demo /home/<user>/ReuseRupture-Demo/iso
+sudo setfacl -m u:libvirt-qemu:r /home/<user>/ReuseRupture-Demo/iso/<file>.iso
+```
+
 ## Windows ISO Path Errors
 
 If `windows.iso_path` exists, setup uses it and skips download. If it does not

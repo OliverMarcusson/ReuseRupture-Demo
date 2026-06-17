@@ -264,6 +264,51 @@ def virsh(args: list[str], *, check: bool = True, capture: bool = False) -> subp
     return run(base, check=check, capture=capture, sudo=True)
 
 
+def qemu_system_user() -> str | None:
+    """The user QEMU runs as under qemu:///system, or None when it runs as root.
+
+    Debian/Ubuntu run QEMU as the unprivileged `libvirt-qemu` user, which cannot
+    read VM media that lives under a `0750` home directory. Distros that run
+    QEMU as root (e.g. a default Arch install) have no such problem.
+    """
+    conf = Path("/etc/libvirt/qemu.conf")
+    if conf.exists():
+        for line in conf.read_text(encoding="utf-8", errors="replace").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("user") and "=" in stripped:
+                user = stripped.split("=", 1)[1].strip().strip('"')
+                return None if user in ("", "root") else user
+    for candidate in ("libvirt-qemu", "qemu"):
+        if run(["getent", "passwd", candidate], check=False, capture=True).returncode == 0:
+            return candidate
+    return None
+
+
+def grant_qemu_media_access(path: Path) -> None:
+    """Let the qemu:///system user read `path` even when it lives outside the
+    libvirt-managed directories (e.g. an ISO under the user's home, which is
+    mode 0750 on Ubuntu so `libvirt-qemu` cannot traverse into it).
+
+    Uses ACLs to grant traverse (x) on each ancestor directory and read (r) on
+    the file itself — the minimal, targeted grant for a single service user.
+    """
+    if "system" not in LIBVIRT_URI:
+        return
+    user = qemu_system_user()
+    if not user:
+        return
+    if not command_exists("setfacl"):
+        warn(f"setfacl not found; QEMU ({user}) may be unable to read {path}.")
+        warn(f"Install the 'acl' package, or grant access manually for {user}.")
+        return
+    path = path.resolve()
+    run(["setfacl", "-m", f"u:{user}:r", str(path)], check=False, sudo=True)
+    for parent in path.parents:
+        if parent == Path("/"):
+            break
+        run(["setfacl", "-m", f"u:{user}:x", str(parent)], check=False, sudo=True)
+
+
 def virt_install(args: list[str]) -> subprocess.CompletedProcess:
     base = ["virt-install", "--connect", LIBVIRT_URI, *args]
     if run(["virsh", "-c", LIBVIRT_URI, "list", "--all"], check=False, capture=True).returncode == 0:

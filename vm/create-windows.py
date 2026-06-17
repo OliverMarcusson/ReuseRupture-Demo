@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory, NamedTemporaryFile
 from xml.sax.saxutils import escape
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.rrlib import ROOT, cfg_path, download_url, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, set_domain_interface_model, step, virt_install, virsh, warn
+from scripts.rrlib import ROOT, cfg_path, download_url, grant_qemu_media_access, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, set_domain_interface_model, step, virt_install, virsh, warn
 
 VIRTIO_DRIVER_SPECS = {
     "viostor": "viostor.inf",
@@ -248,6 +248,11 @@ def main() -> int:
         "spice",
         "--noautoconsole",
     ]
+    # Under qemu:///system the QEMU user (e.g. libvirt-qemu on Ubuntu) must be
+    # able to read the install media even though it lives under the user's home.
+    for media in (iso, answer_iso, *( [virtio_iso] if virtio_iso else [] )):
+        grant_qemu_media_access(media)
+
     step("Starting Windows installation")
     virt_install(install_args)
     ok("Windows installer launched")
