@@ -273,11 +273,16 @@ def qemu_system_user() -> str | None:
     """
     conf = Path("/etc/libvirt/qemu.conf")
     if conf.exists():
-        for line in conf.read_text(encoding="utf-8", errors="replace").splitlines():
-            stripped = line.strip()
-            if stripped.startswith("user") and "=" in stripped:
-                user = stripped.split("=", 1)[1].strip().strip('"')
-                return None if user in ("", "root") else user
+        try:
+            lines = conf.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            warn(f"Could not read {conf}: {exc}. Falling back to QEMU account detection.")
+        else:
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith("user") and "=" in stripped:
+                    user = stripped.split("=", 1)[1].strip().strip('"')
+                    return None if user in ("", "root") else user
     for candidate in ("libvirt-qemu", "qemu"):
         if run(["getent", "passwd", candidate], check=False, capture=True).returncode == 0:
             return candidate
