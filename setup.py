@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import getpass
 import os
+import shlex
 import shutil
 import subprocess
+import sys
 
 from scripts.rrlib import (
     ROOT,
@@ -180,23 +182,37 @@ def start_docker_services() -> None:
 
 
 def ensure_docker_access() -> None:
-    """Give the current user access to the Docker daemon socket.
+    """Give the current user direct access to the Docker daemon socket.
 
     A fresh Docker install leaves the user outside the `docker` group, so the
-    unprivileged client hits 'permission denied' on the socket. Add the user to
-    the group for future sessions; the current run uses sudo for Docker
-    automatically (see rrlib.docker_prefix) since group changes only apply after
-    the next login.
+    unprivileged client hits 'permission denied' on the socket. We add the user
+    to the group, but that does not affect the already-running process, so we
+    re-exec setup once under `sg docker` to pick up the membership immediately —
+    avoiding both a re-login and a fragile sudo-for-Docker path (where sudo's
+    cached credentials expire during the long image build and the next Docker
+    call blocks waiting for a password).
     """
     if not shutil.which("docker"):
         return
     if run(["docker", "info"], check=False, capture=True).returncode == 0:
         return
+
     user = os.environ.get("SUDO_USER") or getpass.getuser()
     step(f"Granting {user} access to the Docker daemon")
     run(["usermod", "-aG", "docker", user], check=False, sudo=True)
+
+    # Re-exec once under the docker group so the rest of the run uses Docker
+    # directly. The env flag prevents an infinite re-exec loop.
+    if os.environ.get("RR_DOCKER_GROUP_REEXEC") != "1" and shutil.which("sg"):
+        info("Re-running setup under the 'docker' group (via sg docker)")
+        inner = shlex.join([sys.executable, *sys.argv])
+        os.execvp("sg", ["sg", "docker", "-c", f"RR_DOCKER_GROUP_REEXEC=1 exec {inner}"])
+
+    # Fallback: no `sg`, or the re-exec did not gain access. Docker calls use
+    # sudo automatically this run (see rrlib.docker_prefix); the group applies
+    # fully after the next login.
     warn(f"Added {user} to the 'docker' group. Log out and back in (or run 'newgrp docker')")
-    warn("to use Docker without sudo. This setup run will use sudo for Docker automatically.")
+    warn("to use Docker without sudo. This run falls back to sudo for Docker.")
 
 
 def prepare_attacker_container() -> None:

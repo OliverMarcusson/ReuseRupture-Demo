@@ -11,14 +11,22 @@ permission denied while trying to connect to the Docker daemon socket
 ```
 
 A fresh Docker install leaves your user outside the `docker` group. `setup.py`
-adds you automatically and falls back to `sudo` for Docker during the run, so
-setup still completes. To use Docker without `sudo` afterwards, start a new
-login session (or run `newgrp docker`) so the new group membership applies:
+adds you automatically and then re-executes itself under the `docker` group
+(via `sg docker`) so the rest of the run can talk to Docker directly — no
+re-login required. If `sg` is unavailable it falls back to `sudo` for Docker.
+
+To use Docker without any of this afterwards, start a new login session (or run
+`newgrp docker`) so the new group membership applies to your shell:
 
 ```bash
 sudo usermod -aG docker "$USER"   # setup.py already does this
 newgrp docker                     # or log out and back in
 ```
+
+If a Docker step ever appears to hang with no output, it may be `sudo` waiting
+for a password (its cached credentials expire during the long image build).
+The `sg docker` re-exec above avoids this; ensure the `sg` command is installed
+(`util-linux` / `passwd` package).
 
 ## Libvirt Bridge Permission Errors
 
