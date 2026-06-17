@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.rrlib import ROOT, cfg_path, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, start_viewer, step, virt_install, virsh
+from scripts.rrlib import ROOT, cfg_path, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, step, virt_install, virsh
 
 
 def sha256(path: Path) -> str:
@@ -180,7 +180,6 @@ def main() -> int:
         info(f"Source image: {image_path}")
         run(["cp", image_path, str(disk)], sudo=True)
         virt_install(["--name", kali["vm_name"], "--memory", str(memory_mb), "--vcpus", str(vcpus), "--disk", f"path={disk},format=qcow2,bus=virtio", "--os-variant", "debian12", "--network", f"network={cfg['network']['name']},model=virtio", "--import", "--noautoconsole"])
-        start_viewer(kali["vm_name"])
         return 0
 
     iso = cfg_path(kali["iso_path"])
@@ -240,7 +239,6 @@ def main() -> int:
         "--noautoconsole",
     ])
     set_domain_boot_to_disk(kali["vm_name"])
-    start_viewer(kali["vm_name"])
     return 0
 
 

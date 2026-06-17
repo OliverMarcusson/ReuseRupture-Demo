@@ -30,7 +30,7 @@ from scripts.rrlib import (
 REQUIRED_COMMANDS = [
     "python3", "pip3", "ansible", "ansible-galaxy", "ansible-playbook",
     "docker", "virsh", "virt-install", "virt-xml", "qemu-img", "vagrant",
-    "curl", "sha256sum", "xorriso", "cpio", "gzip", "virt-viewer", "aria2c",
+    "curl", "sha256sum", "xorriso", "cpio", "gzip", "aria2c",
 ]
 
 # Per-distro package sets, keyed by the package-manager binary we detect.
@@ -45,7 +45,7 @@ PACKAGE_MANAGERS = {
             "docker-compose-plugin", "freerdp2-x11", "gzip", "libvirt-clients",
             "libvirt-daemon-system", "python3", "python3-pip", "python3-winrm",
             "python3-yaml", "qemu-kvm", "qemu-utils", "sshpass", "vagrant",
-            "vagrant-libvirt", "virtinst", "virt-viewer", "xorriso", "aria2",
+            "vagrant-libvirt", "virtinst", "xorriso", "aria2",
         ],
     },
     "dnf": {
@@ -56,7 +56,7 @@ PACKAGE_MANAGERS = {
             "docker-compose-plugin", "freerdp", "gzip", "libvirt", "python3",
             "python3-pip", "python3-winrm", "python3-PyYAML", "qemu-img",
             "qemu-kvm", "sshpass", "vagrant", "vagrant-libvirt", "virt-install",
-            "virt-viewer", "xorriso", "aria2",
+            "xorriso", "aria2",
         ],
     },
     "pacman": {
@@ -67,7 +67,7 @@ PACKAGE_MANAGERS = {
             "freerdp", "gzip", "libvirt", "libvirt-glib", "make", "gcc",
             "python", "python-pip", "python-pywinrm", "python-yaml",
             "qemu-desktop", "sshpass", "vagrant", "vagrant-libvirt",
-            "virt-install", "virt-viewer", "xorriso", "aria2",
+            "virt-install", "xorriso", "aria2",
         ],
     },
 }
@@ -90,7 +90,7 @@ def install_host_dependencies() -> None:
     else:
         raise SystemExit(
             "Unsupported package manager. Install these manually: libvirt, qemu, "
-            "virt-install, Ansible, PyYAML, curl, xorriso, cpio, gzip, virt-viewer."
+            "virt-install, Ansible, PyYAML, curl, xorriso, cpio, gzip."
         )
 
     require_cmds(REQUIRED_COMMANDS)
@@ -179,7 +179,6 @@ def wait_for_management_services() -> int:
             warn("Setup is stopping cleanly so you can inspect the VM windows.")
             warn("Useful checks:")
             warn("  virsh -c qemu:///system list --all")
-            warn("  virt-viewer --connect qemu:///system reuserupture-dc")
             warn("After fixing the VM state, continue with:")
             warn("  ./setup.py --ansible-only")
             return result.returncode
@@ -215,7 +214,7 @@ def main() -> int:
         step("Creating or reusing lab VM")
         result = run([str(ROOT / "vm/create-lab.py")], check=False)
         if result.returncode != 0:
-            warn("VM setup failed. Inspect the VM viewer window and rerun ./setup.py when ready.")
+            warn("VM setup failed. Inspect the VM state with 'virsh -c qemu:///system list --all' and rerun ./setup.py when ready.")
             return result.returncode
     else:
         info("Skipping VM creation")

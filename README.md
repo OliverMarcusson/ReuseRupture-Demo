@@ -82,10 +82,6 @@ The Python versions are intentionally more verbose and easier to read. Matching
 copies also exist under `vm/` and `scripts/`, for example
 `vm/create-windows.py` and `scripts/verify-lab.py`.
 
-During Windows VM installation, setup opens a best-effort read-only
-`virt-viewer` window so you can monitor progress without interacting with the
-installer.
-
 Useful setup modes:
 
 ```bash

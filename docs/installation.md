@@ -48,7 +48,3 @@ If only Ansible configuration is needed:
 ```bash
 ./setup.py --ansible-only
 ```
-
-The VM installation scripts open read-only `virt-viewer` windows when a new
-Kali or Windows VM install starts. If `virt-viewer` is not available, setup
-continues and prints a warning.

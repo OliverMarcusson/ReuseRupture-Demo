@@ -362,48 +362,6 @@ def cold_boot_domain(vm_name: str) -> None:
     virsh(["start", vm_name], check=False)
 
 
-def start_viewer(vm_name: str) -> None:
-    """Open a best-effort read-only viewer for a running VM."""
-    candidates: list[list[str]] = []
-    virt_viewer = shutil.which("virt-viewer")
-    remote_viewer = shutil.which("remote-viewer")
-
-    if virt_viewer:
-        help_text = run([virt_viewer, "--help"], check=False, capture=True).stdout
-        command = [virt_viewer, "--connect", LIBVIRT_URI, "--wait", vm_name]
-        if "--view-only" in help_text:
-            command.insert(1, "--view-only")
-        else:
-            warn("This virt-viewer build does not support --view-only; opening a normal monitor window.")
-        candidates.append(command)
-    if remote_viewer:
-        display = virsh(["domdisplay", vm_name], check=False, capture=True)
-        if display.returncode == 0 and display.stdout.strip():
-            help_text = run([remote_viewer, "--help"], check=False, capture=True).stdout
-            command = [remote_viewer, display.stdout.strip()]
-            if "--view-only" in help_text:
-                command.insert(1, "--view-only")
-            candidates.append(command)
-
-    if not candidates:
-        warn(f"No supported VM viewer was found for {vm_name}. Install virt-viewer.")
-        return
-
-    for cmd in candidates:
-        try:
-            process = subprocess.Popen(cmd, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(1)
-            if process.poll() is None:
-                ok(f"Opened read-only VM viewer for {vm_name}")
-                info("Manual viewer command: " + " ".join(cmd))
-                return
-        except OSError as exc:
-            warn(f"Viewer command failed for {vm_name}: {exc}")
-
-    warn(f"Could not open a VM viewer window for {vm_name}.")
-    warn("Try manually: " + " ".join(candidates[0]))
-
-
 def save_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")

@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory, NamedTemporaryFile
 from xml.sax.saxutils import escape
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.rrlib import ROOT, cfg_path, download_url, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, set_domain_interface_model, start_viewer, step, virt_install, virsh, warn
+from scripts.rrlib import ROOT, cfg_path, download_url, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, set_domain_interface_model, step, virt_install, virsh, warn
 
 VIRTIO_DRIVER_SPECS = {
     "viostor": "viostor.inf",
@@ -250,7 +250,6 @@ def main() -> int:
     ]
     step("Starting Windows installation")
     virt_install(install_args)
-    start_viewer(win["vm_name"])
     ok("Windows installer launched")
     return 0
 
