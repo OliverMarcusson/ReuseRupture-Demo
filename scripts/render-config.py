@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Render ReuseRupture config as shell env, Ansible inventory, or JSON."""
 
-from __future__ import annotations
 
 import argparse
 import copy
@@ -16,7 +15,7 @@ import yaml
 SECRET_KEYS = {"password", "administrator_password", "demo_password", "asrep_password"}
 
 
-def deep_merge(base: dict, override: dict) -> dict:
+def deep_merge(base, override):
     result = copy.deepcopy(base)
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(result.get(key), dict):
@@ -26,7 +25,7 @@ def deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-def load_config(path: Path) -> dict:
+def load_config(path):
     example = Path("config.example.yml")
     if not example.exists():
         raise SystemExit("config.example.yml is missing")
@@ -37,7 +36,7 @@ def load_config(path: Path) -> dict:
     return deep_merge(base, user)
 
 
-def validate(config: dict) -> None:
+def validate(config):
     required = [
         ("windows", "iso_path"),
         ("windows", "ip"),
@@ -49,7 +48,7 @@ def validate(config: dict) -> None:
         raise SystemExit("missing required config values: " + ", ".join(missing))
 
 
-def flatten(prefix: str, value: object, out: dict[str, object]) -> None:
+def flatten(prefix, value, out):
     if isinstance(value, dict):
         for key, child in value.items():
             flatten(f"{prefix}_{key}" if prefix else key, child, out)
@@ -57,8 +56,8 @@ def flatten(prefix: str, value: object, out: dict[str, object]) -> None:
         out[prefix.upper()] = value
 
 
-def render_env(config: dict) -> str:
-    flat: dict[str, object] = {}
+def render_env(config):
+    flat = {}
     flatten("", config, flat)
     lines = []
     for key in sorted(flat):
@@ -69,7 +68,7 @@ def render_env(config: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def inventory(config: dict) -> dict:
+def inventory(config):
     win = config["windows"]
     ad = config["active_directory"]
     return {
@@ -101,11 +100,11 @@ def inventory(config: dict) -> dict:
     }
 
 
-def all_vars(config: dict) -> dict:
+def all_vars(config):
     return {"rr": config}
 
 
-def redact(value: object, key: str = "") -> object:
+def redact(value, key = ""):
     if isinstance(value, dict):
         return {k: redact(v, k) for k, v in value.items()}
     if key in SECRET_KEYS or key.endswith("_password"):
@@ -113,7 +112,7 @@ def redact(value: object, key: str = "") -> object:
     return value
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yml")
     parser.add_argument("--format", choices=["env", "inventory", "all-vars", "json", "redacted-json"], required=True)

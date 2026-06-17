@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Download a public Google Drive file using only the Python standard library."""
 
-from __future__ import annotations
 
 import argparse
-import hashlib
 import html.parser
 import http.cookiejar
 import json
@@ -18,13 +16,13 @@ from pathlib import Path
 
 
 class ConfirmFormParser(html.parser.HTMLParser):
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
         self.in_form = False
-        self.form_action: str | None = None
-        self.inputs: dict[str, str] = {}
+        self.form_action = None
+        self.inputs = {}
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def handle_starttag(self, tag, attrs):
         attr = {k: v or "" for k, v in attrs}
         if tag == "form" and ("download" in attr.get("action", "") or "uc" in attr.get("action", "")):
             self.in_form = True
@@ -32,12 +30,12 @@ class ConfirmFormParser(html.parser.HTMLParser):
         elif self.in_form and tag == "input" and attr.get("name"):
             self.inputs[attr["name"]] = attr.get("value", "")
 
-    def handle_endtag(self, tag: str) -> None:
+    def handle_endtag(self, tag):
         if tag == "form" and self.in_form:
             self.in_form = False
 
 
-def file_id_from(value: str) -> str:
+def file_id_from(value):
     if re.fullmatch(r"[-_A-Za-z0-9]+", value):
         return value
     parsed = urllib.parse.urlparse(value)
@@ -50,12 +48,12 @@ def file_id_from(value: str) -> str:
     raise SystemExit(f"Could not extract Google Drive file id from: {value}")
 
 
-def opener() -> urllib.request.OpenerDirector:
+def opener():
     jar = http.cookiejar.CookieJar()
     return urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
 
 
-def open_url(op: urllib.request.OpenerDirector, url: str):
+def open_url(op, url):
     request = urllib.request.Request(
         url,
         headers={
@@ -66,7 +64,7 @@ def open_url(op: urllib.request.OpenerDirector, url: str):
     return op.open(request, timeout=60)
 
 
-def candidate_urls(file_id: str) -> list[str]:
+def candidate_urls(file_id):
     query = urllib.parse.urlencode({"export": "download", "id": file_id})
     return [
         f"https://drive.google.com/uc?{query}",
@@ -75,7 +73,7 @@ def candidate_urls(file_id: str) -> list[str]:
     ]
 
 
-def extract_download_url(body: str) -> str | None:
+def extract_download_url(body):
     match = re.search(r'"downloadUrl"\s*:\s*"([^"]+)"', body)
     if not match:
         return None
@@ -83,7 +81,7 @@ def extract_download_url(body: str) -> str | None:
     return json.loads(f'"{match.group(1)}"')
 
 
-def maybe_confirm(op: urllib.request.OpenerDirector, response):
+def maybe_confirm(op, response):
     content_type = response.headers.get("Content-Type", "")
     if "text/html" not in content_type:
         return response
@@ -106,18 +104,10 @@ def maybe_confirm(op: urllib.request.OpenerDirector, response):
     return open_url(op, url)
 
 
-def sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def resolve_download_url(url_or_id: str) -> tuple[str, str]:
+def resolve_download_url(url_or_id):
     file_id = file_id_from(url_or_id)
     op = opener()
-    last_error: Exception | None = None
+    last_error = None
     for url in candidate_urls(file_id):
         try:
             response = maybe_confirm(op, open_url(op, url))
@@ -132,7 +122,7 @@ def resolve_download_url(url_or_id: str) -> tuple[str, str]:
     )
 
 
-def download(url_or_id: str, output: Path, expected_sha256: str = "") -> None:
+def download(url_or_id, output):
     output.parent.mkdir(parents=True, exist_ok=True)
     resolved_url, file_id = resolve_download_url(url_or_id)
     print(f"Downloading Google Drive file {file_id} to {output}")
@@ -152,24 +142,13 @@ def download(url_or_id: str, output: Path, expected_sha256: str = "") -> None:
         check=True,
     )
 
-    if expected_sha256:
-        actual = sha256(output)
-        if actual.lower() != expected_sha256.lower():
-            output.unlink(missing_ok=True)
-            raise SystemExit(
-                f"SHA-256 mismatch for {output}\nexpected: {expected_sha256}\nactual:   {actual}"
-            )
-    else:
-        print("WARNING: no SHA-256 configured for this download; file authenticity was not verified.")
 
-
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--sha256", default="")
     args = parser.parse_args()
-    download(args.url, Path(args.output), args.sha256.strip())
+    download(args.url, Path(args.output))
     return 0
 
 

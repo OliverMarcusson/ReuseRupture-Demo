@@ -14,8 +14,6 @@ windows:
   iso_path: iso/windows-server-2025-eval.iso
   download_iso: true
   iso_url: https://drive.google.com/file/d/15D3YaClnwR221122uNCwLenRPZpqIk_k/view?usp=sharing
-  # Optional but recommended: set this after the first trusted download.
-  iso_sha256: ""
   edition: Windows Server 2025 Standard Evaluation (Desktop Experience)
   interface_alias: Ethernet
   username: Administrator
@@ -28,7 +26,6 @@ windows:
     iso_path: iso/virtio-win.iso
     download_iso: true
     iso_url: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
-    iso_sha256: ""
     driver_folders:
       - 2k25
       - 2k22

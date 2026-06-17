@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """scripts/verify-lab.py."""
 
-from __future__ import annotations
 
 import json
 import socket
@@ -14,7 +13,7 @@ passed = 0
 failed = 0
 
 
-def check(name: str, command) -> None:
+def check(name, command):
     global passed, failed
     try:
         ok = command()
@@ -34,21 +33,21 @@ def check(name: str, command) -> None:
         failed += 1
 
 
-def ansible_ok(args: list[str]) -> bool:
+def ansible_ok(args):
     result = run(["ansible", "-i", str(ROOT / "inventory/hosts.yml"), *args], check=False, capture=True)
     if result.returncode != 0:
         print((result.stdout + result.stderr).strip())
     return result.returncode == 0
 
 
-def attacker_ok(args: list[str]) -> bool:
+def attacker_ok(args):
     result = attacker_exec(args, check=False, capture=True)
     if result.returncode != 0:
         print((result.stdout + result.stderr).strip())
     return result.returncode == 0
 
 
-def retry_ok(predicate, attempts: int = 5, delay: int = 3) -> bool:
+def retry_ok(predicate, attempts = 5, delay = 3):
     # A single DNS/UDP query against the DC can time out transiently even when
     # the lab is healthy, so retry before declaring failure. A genuinely broken
     # service still fails every attempt.
@@ -60,7 +59,7 @@ def retry_ok(predicate, attempts: int = 5, delay: int = 3) -> bool:
     return False
 
 
-def dns_resolves_dc(fqdn: str, dc_ip: str) -> bool:
+def dns_resolves_dc(fqdn, dc_ip):
     # Query the DC's DNS service directly instead of going through the container
     # resolver. Docker copies the host's /etc/resolv.conf, which on this host is
     # a 127.0.0.53 systemd-resolved stub that does not exist inside the
@@ -75,7 +74,7 @@ def dns_resolves_dc(fqdn: str, dc_ip: str) -> bool:
     return True
 
 
-def port_can_bind(port: int) -> bool:
+def port_can_bind(port):
     sock = socket.socket()
     try:
         sock.bind(("0.0.0.0", port))
@@ -84,7 +83,7 @@ def port_can_bind(port: int) -> bool:
         sock.close()
 
 
-def main() -> int:
+def main():
     config = load_config()
     render_inventory()
 

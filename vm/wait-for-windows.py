@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """vm/wait-for-windows.py."""
 
-from __future__ import annotations
 
 import sys
 from pathlib import Path
@@ -10,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.rrlib import ensure_domain_running, load_config, set_domain_boot_to_disk, set_domain_interface_model, wait_for_vm_tcp, warn
 
 
-def main() -> int:
+def main():
     cfg = load_config()
     vm_name = cfg["windows"]["vm_name"]
     set_domain_boot_to_disk(vm_name)

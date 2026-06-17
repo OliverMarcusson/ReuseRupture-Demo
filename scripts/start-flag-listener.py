@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """scripts/start-flag-listener.py."""
 
-from __future__ import annotations
 
 import argparse
 from pathlib import Path
@@ -9,7 +8,7 @@ from pathlib import Path
 from rrlib import ROOT, attacker_cmd, container_path, ensure_repo_writable_dir, load_config, run
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("run_id", nargs="?", default="")
     parser.add_argument("evidence_dir", nargs="?")

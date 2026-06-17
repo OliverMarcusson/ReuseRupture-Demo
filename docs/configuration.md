@@ -9,9 +9,9 @@
 Important values:
 
 - `windows.iso_path`: user-supplied Windows Server ISO.
-- `windows.download_iso`, `windows.iso_url`, `windows.iso_sha256`: Windows ISO
-  download/cache/verification settings. If `windows.iso_path` exists locally,
-  setup uses it and skips download.
+- `windows.download_iso`, `windows.iso_url`: Windows ISO download/cache
+  settings. If `windows.iso_path` exists locally, setup uses it and skips
+  download.
 - `windows.interface_alias`: Windows interface name, usually `Ethernet`.
 - `windows.memory_mb`, `windows.vcpus`:
   set to `auto` for host-aware sizing, or use explicit numbers to force fixed

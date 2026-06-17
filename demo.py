@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """demo.py."""
 
-from __future__ import annotations
 
 import argparse
 import json
@@ -31,7 +30,7 @@ from scripts.rrlib import (
 )
 
 
-def run_logged(name: str, evidence_dir: Path, command: list[str]) -> int:
+def run_logged(name, evidence_dir, command):
     """Run a command, stream its output, and save it to <name>.log."""
     process = subprocess.run(command, cwd=str(ROOT), text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     print(process.stdout, end="" if process.stdout.endswith("\n") else "\n")
@@ -39,7 +38,7 @@ def run_logged(name: str, evidence_dir: Path, command: list[str]) -> int:
     return process.returncode
 
 
-def dc_powershell(script: str) -> subprocess.CompletedProcess:
+def dc_powershell(script):
     """Run a PowerShell snippet on the domain controller via Ansible."""
     return run(
         [
@@ -52,13 +51,13 @@ def dc_powershell(script: str) -> subprocess.CompletedProcess:
     )
 
 
-def dc_powershell_logged(script: str, evidence_dir: Path, log_name: str) -> int:
+def dc_powershell_logged(script, evidence_dir, log_name):
     result = dc_powershell(script)
     (evidence_dir / log_name).write_text(result.stdout + result.stderr, encoding="utf-8")
     return result.returncode
 
 
-def dc_powershell_lines(script: str) -> list[str]:
+def dc_powershell_lines(script):
     """Run PowerShell on the DC and return only the script's output lines.
 
     Forces the minimal stdout callback so we can parse the JSON result and strip
@@ -86,7 +85,7 @@ def dc_powershell_lines(script: str) -> list[str]:
     return [str(line) for line in payload.get("output", [])]
 
 
-def prepare_evidence_dir(config: dict, run_id: str) -> Path:
+def prepare_evidence_dir(config, run_id):
     evidence_root = ROOT / config["demo"]["evidence_root"]
     ensure_repo_writable_dir(evidence_root)
     evidence_dir = evidence_root / utc_stamp()
@@ -98,7 +97,7 @@ def prepare_evidence_dir(config: dict, run_id: str) -> Path:
     return evidence_dir
 
 
-def start_flag_listener(config: dict, run_id: str, evidence_dir: Path) -> subprocess.Popen | None:
+def start_flag_listener(config, run_id, evidence_dir):
     """Start the flag listener in the attacker container; return None if it dies immediately."""
     step("Starting flag listener in attacker container")
     listener_log = evidence_dir / "listener.log"
@@ -125,7 +124,7 @@ def start_flag_listener(config: dict, run_id: str, evidence_dir: Path) -> subpro
     return listener
 
 
-def watch_for_reboot(config: dict, evidence_dir: Path) -> bool:
+def watch_for_reboot(config, evidence_dir):
     """Watch WinRM go down then come back. Return True only if both are observed."""
     step("Watching for reboot down/up sequence")
     ip = config["windows"]["ip"]
@@ -156,7 +155,7 @@ def watch_for_reboot(config: dict, evidence_dir: Path) -> bool:
     return False
 
 
-def show_dc_callback_log(evidence_dir: Path) -> None:
+def show_dc_callback_log(evidence_dir):
     lines = dc_powershell_lines(
         "Get-Content C:\\ReuseRuptureDemo\\flag-callback.log -ErrorAction SilentlyContinue "
         "| Select-Object -Last 30"
@@ -166,7 +165,7 @@ def show_dc_callback_log(evidence_dir: Path) -> None:
         info("DC confirms: " + lines[-1].strip())
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--skip-scan", action="store_true")
@@ -259,7 +258,7 @@ def main() -> int:
     return 0
 
 
-def reveal_flag(flag: str, run_id: str, evidence_dir: Path) -> None:
+def reveal_flag(flag, run_id, evidence_dir):
     line = "=" * 72
     print(f"\n{line}")
     print("  >>> FLAG CAPTURED <<<")

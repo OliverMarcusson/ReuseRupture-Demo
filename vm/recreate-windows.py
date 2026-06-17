@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Recreate only the Windows VM, preserving attacker container state and cached ISOs."""
 
-from __future__ import annotations
 
 import sys
 from pathlib import Path
@@ -10,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.rrlib import ROOT, banner, load_config, run, step, virsh, warn
 
 
-def main() -> int:
+def main():
     cfg = load_config()
     vm_name = cfg["windows"]["vm_name"]
     disk = Path(f"/var/lib/libvirt/images/{vm_name}.qcow2")

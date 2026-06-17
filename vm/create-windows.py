@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """vm/create-windows.py."""
 
-from __future__ import annotations
 
 import sys
 import subprocess
@@ -10,7 +9,7 @@ from tempfile import TemporaryDirectory, NamedTemporaryFile
 from xml.sax.saxutils import escape
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.rrlib import ROOT, cfg_path, download_url, grant_qemu_media_access, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, set_domain_interface_model, step, virt_install, virsh, warn
+from scripts.rrlib import ROOT, cfg_path, download_url, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, set_domain_interface_model, stage_libvirt_media, step, virt_install, virsh, warn
 
 VIRTIO_DRIVER_SPECS = {
     "viostor": "viostor.inf",
@@ -19,7 +18,7 @@ VIRTIO_DRIVER_SPECS = {
 MEDIA_LETTERS = ["D", "E", "F", "G", "H", "I", "J", "K"]
 
 
-def local_iso_candidates() -> list[Path]:
+def local_iso_candidates():
     candidates = []
     for path in ROOT.rglob("*.iso"):
         if "kali" not in path.name.lower():
@@ -30,11 +29,11 @@ def local_iso_candidates() -> list[Path]:
     return sorted(set(candidates))
 
 
-def iso_path_exists(iso: Path, path: str) -> bool:
+def iso_path_exists(iso, path):
     return run(["xorriso", "-indev", str(iso), "-find", path, "-maxdepth", "0"], check=False, capture=True).returncode == 0
 
 
-def select_virtio_driver_payload(virtio_iso: Path, folders: list[str]) -> dict[str, str]:
+def select_virtio_driver_payload(virtio_iso, folders):
     selected = {}
     for driver_root, inf_name in VIRTIO_DRIVER_SPECS.items():
         for folder in folders:
@@ -48,7 +47,7 @@ def select_virtio_driver_payload(virtio_iso: Path, folders: list[str]) -> dict[s
     return selected
 
 
-def extract_virtio_driver_payload(virtio_iso: Path, media_dir: Path, selected: dict[str, str]) -> list[str]:
+def extract_virtio_driver_payload(virtio_iso, media_dir, selected):
     media_paths = []
     for driver_root, folder in selected.items():
         source = f"/{driver_root}/{folder}/amd64"
@@ -60,7 +59,7 @@ def extract_virtio_driver_payload(virtio_iso: Path, media_dir: Path, selected: d
     return media_paths
 
 
-def virtio_drvload_commands(letters: list[str], selected: dict[str, str]) -> str:
+def virtio_drvload_commands(letters, selected):
     commands = []
     order = 1
     for driver_root, inf_name in VIRTIO_DRIVER_SPECS.items():
@@ -80,7 +79,7 @@ def virtio_drvload_commands(letters: list[str], selected: dict[str, str]) -> str
     return "      <RunSynchronous>\n" + "\n".join(commands) + "\n      </RunSynchronous>"
 
 
-def virtio_offline_servicing(letters: list[str], selected: dict[str, str]) -> str:
+def virtio_offline_servicing(letters, selected):
     # Inject the VirtIO drivers into the *offline* (installed) image so the
     # finished OS owns viostor (boot-critical, or it bugchecks with
     # INACCESSIBLE_BOOT_DEVICE / 0x7B) and NetKVM (or it has no working NIC for
@@ -112,7 +111,7 @@ def virtio_offline_servicing(letters: list[str], selected: dict[str, str]) -> st
     return "\n".join(lines)
 
 
-def inject_windows_pe_virtio(text: str, selected: dict[str, str]) -> str:
+def inject_windows_pe_virtio(text, selected):
     # Load VirtIO storage/network drivers with drvload during windowsPE so Setup
     # can see the VirtIO disk to install onto.
     #
@@ -131,7 +130,7 @@ def inject_windows_pe_virtio(text: str, selected: dict[str, str]) -> str:
     return text
 
 
-def explain_missing_windows_iso(configured_iso: Path) -> str:
+def explain_missing_windows_iso(configured_iso):
     candidates = local_iso_candidates()
     lines = [
         f"Windows ISO is not available at: {configured_iso}",
@@ -150,7 +149,7 @@ def explain_missing_windows_iso(configured_iso: Path) -> str:
     return "\n".join(lines)
 
 
-def main() -> int:
+def main():
     cfg = load_config()
     win = cfg["windows"]
     virtio = win.get("virtio", {})
@@ -176,7 +175,7 @@ def main() -> int:
         step("Downloading Windows Server evaluation ISO")
         info(win["iso_url"])
         try:
-            run([str(ROOT / "scripts/download-google-drive-file.py"), "--url", win["iso_url"], "--output", str(iso), "--sha256", str(win.get("iso_sha256") or "")])
+            run([str(ROOT / "scripts/download-google-drive-file.py"), "--url", win["iso_url"], "--output", str(iso)])
         except subprocess.CalledProcessError as exc:
             raise SystemExit(explain_missing_windows_iso(iso)) from exc
     else:
@@ -189,7 +188,7 @@ def main() -> int:
             info(f"Using local VirtIO ISO: {virtio_iso}")
         elif virtio.get("download_iso", True):
             step("Downloading VirtIO Windows driver ISO")
-            download_url(str(virtio["iso_url"]), virtio_iso, str(virtio.get("iso_sha256") or ""))
+            download_url(str(virtio["iso_url"]), virtio_iso)
         else:
             raise SystemExit(f"VirtIO ISO is missing and download is disabled: {virtio_iso}")
 
@@ -227,6 +226,9 @@ def main() -> int:
         run(["qemu-img", "create", "-f", "qcow2", str(disk), f"{win['disk_gb']}G"], sudo=True)
     disk_bus = "virtio" if use_virtio_devices else "sata"
     nic_model = "virtio" if use_virtio_devices else "e1000e"
+    staged_iso = stage_libvirt_media(iso)
+    staged_answer_iso = stage_libvirt_media(answer_iso)
+
     install_args = [
         "--name",
         win["vm_name"],
@@ -237,9 +239,9 @@ def main() -> int:
         "--disk",
         f"path={disk},format=qcow2,bus={disk_bus}",
         "--disk",
-        f"path={answer_iso},device=cdrom,readonly=on,bus=sata",
+        f"path={staged_answer_iso},device=cdrom,readonly=on,bus=sata",
         "--cdrom",
-        str(iso),
+        str(staged_iso),
         "--os-variant",
         "win2k22",
         "--network",
@@ -248,11 +250,6 @@ def main() -> int:
         "spice",
         "--noautoconsole",
     ]
-    # Under qemu:///system the QEMU user (e.g. libvirt-qemu on Ubuntu) must be
-    # able to read the install media even though it lives under the user's home.
-    for media in (iso, answer_iso, *( [virtio_iso] if virtio_iso else [] )):
-        grant_qemu_media_access(media)
-
     step("Starting Windows installation")
     virt_install(install_args)
     ok("Windows installer launched")

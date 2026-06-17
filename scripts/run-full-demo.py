@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """scripts/run-full-demo.py."""
 
-from __future__ import annotations
 
 from rrlib import ROOT, attacker_cmd, container_path, ensure_repo_writable_dir, load_config, run, utc_stamp
 
 
-def main() -> int:
+def main():
     config = load_config()
     evidence_root = ROOT / config["demo"]["evidence_root"]
     ensure_repo_writable_dir(evidence_root)

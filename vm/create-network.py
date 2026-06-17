@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """vm/create-network.py."""
 
-from __future__ import annotations
 
 import tempfile
 import sys
@@ -11,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.rrlib import info, load_config, ok, virsh
 
 
-def main() -> int:
+def main():
     cfg = load_config()
     name = cfg["network"]["name"]
     if virsh(["net-info", name], check=False, capture=True).returncode == 0:

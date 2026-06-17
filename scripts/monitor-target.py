@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """scripts/monitor-target.py."""
 
-from __future__ import annotations
 
 import socket
 import time
@@ -10,7 +9,7 @@ from datetime import datetime, timezone
 from rrlib import load_config
 
 
-def is_port_open(host: str, port: int) -> bool:
+def is_port_open(host, port):
     try:
         with socket.create_connection((host, port), timeout=2):
             return True
@@ -18,7 +17,7 @@ def is_port_open(host: str, port: int) -> bool:
         return False
 
 
-def main() -> int:
+def main():
     config = load_config()
     host = config["windows"]["ip"]
     port = int(config["windows"]["winrm_port"])

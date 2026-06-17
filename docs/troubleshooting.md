@@ -10,23 +10,23 @@ Enable VT-x/AMD-V in firmware. Check `lsmod | grep kvm` and `virsh list`.
 permission denied while trying to connect to the Docker daemon socket
 ```
 
-A fresh Docker install leaves your user outside the `docker` group. `setup.py`
-adds you automatically and then re-executes itself under the `docker` group
-(via `sg docker`) so the rest of the run can talk to Docker directly — no
-re-login required. If `sg` is unavailable it falls back to `sudo` for Docker.
+A Docker install often leaves your user outside the `docker` group. The scripts
+do not edit groups or re-exec the session; if unprivileged Docker is not
+available, they use `sudo` for Docker commands.
 
-To use Docker without any of this afterwards, start a new login session (or run
-`newgrp docker`) so the new group membership applies to your shell:
+To require unprivileged Docker access instead, run with:
 
 ```bash
-sudo usermod -aG docker "$USER"   # setup.py already does this
-newgrp docker                     # or log out and back in
+RR_DOCKER_SUDO=0 ./setup.py
 ```
 
-If a Docker step ever appears to hang with no output, it may be `sudo` waiting
-for a password (its cached credentials expire during the long image build).
-The `sg docker` re-exec above avoids this; ensure the `sg` command is installed
-(`util-linux` / `passwd` package).
+To use Docker without sudo in future shells, configure it manually and start a
+new login session:
+
+```bash
+sudo usermod -aG docker "$USER"
+newgrp docker
+```
 
 ## Libvirt Bridge Permission Errors
 
@@ -37,16 +37,16 @@ error creating bridge interface virbr-rr: Operation not permitted
 ```
 
 the VM network was being created without system libvirt privileges. The scripts
-use `qemu:///system` and fall back to `sudo` for libvirt operations. Rerun:
+use `qemu:///system` and run libvirt commands through `sudo` by default. Rerun:
 
 ```bash
 ./setup.py
 ```
 
-For future passwordless runs, add your user to the libvirt group and log out/in:
+To require unprivileged libvirt access instead, run with:
 
 ```bash
-sudo usermod -aG libvirt "$USER"
+RR_LIBVIRT_SUDO=0 ./setup.py
 ```
 
 If a failed rootless network was left behind, it is harmless because the lab now
@@ -86,16 +86,10 @@ sudo systemctl enable --now libvirtd
 Could not open '/home/<user>/.../iso/...': Permission denied
 ```
 
-Under `qemu:///system`, Debian/Ubuntu run QEMU as the unprivileged
-`libvirt-qemu` user, which cannot traverse a `0750` home directory to read VM
-media stored there. `create-windows.py` grants that user the minimal ACLs it
-needs (traverse on the parent directories, read on the ISO) using `setfacl`, so
-the `acl` package must be installed. To grant access manually:
-
-```bash
-sudo setfacl -m u:libvirt-qemu:x /home /home/<user> /home/<user>/ReuseRupture-Demo /home/<user>/ReuseRupture-Demo/iso
-sudo setfacl -m u:libvirt-qemu:r /home/<user>/ReuseRupture-Demo/iso/<file>.iso
-```
+Under `qemu:///system`, QEMU may not be able to read media from a user home
+directory. `create-windows.py` stages install media under
+`/var/lib/libvirt/images/reuserupture-media/` before launching `virt-install`.
+If staging fails, confirm sudo works and that `/var/lib/libvirt/images` exists.
 
 ## Windows ISO Path Errors
 
@@ -164,8 +158,8 @@ Wait several minutes after promotion, then rerun `./setup.py --ansible-only`.
 
 ## DNS Failures
 
-Check that the attacker container uses `192.168.56.10` as DNS and that
-`/etc/hosts` contains the fallback `DC01.reuserupture.local` entry.
+Check that the attacker container can query `192.168.56.10` directly. Compose
+also injects configured DC hostnames through `extra_hosts`.
 
 ## Kerberos Clock Skew
 

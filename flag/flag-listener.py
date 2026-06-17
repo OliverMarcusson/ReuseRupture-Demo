@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """HTTP listener for the ReuseRupture reboot proof flag."""
 
-from __future__ import annotations
 
 import argparse
 import json
@@ -12,18 +11,18 @@ from pathlib import Path
 
 
 class FlagState:
-    def __init__(self, expected_run_id: str | None, evidence_dir: Path):
+    def __init__(self, expected_run_id, evidence_dir):
         self.expected_run_id = expected_run_id
         self.evidence_dir = evidence_dir
         self.received = False
-        self.payload: dict[str, object] | None = None
+        self.payload = None
 
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "ReuseRuptureFlagListener/1.0"
 
-    def do_POST(self) -> None:
-        state: FlagState = self.server.state  # type: ignore[attr-defined]
+    def do_POST(self):
+        state = self.server.state
         if self.path != "/flag":
             self.send_error(404)
             return
@@ -52,11 +51,11 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"ok\n")
 
-    def log_message(self, fmt: str, *args: object) -> None:
+    def log_message(self, fmt, *args):
         print(f"{self.address_string()} - {fmt % args}", flush=True)
 
 
-def print_flag(payload: dict[str, object]) -> None:
+def print_flag(payload):
     print("=" * 60)
     print("FLAG RECEIVED FROM DOMAIN CONTROLLER")
     print(payload.get("flag", "<missing flag>"))
@@ -66,7 +65,7 @@ def print_flag(payload: dict[str, object]) -> None:
     print("=" * 60)
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser(description="Receive the ReuseRupture CTF flag callback")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, required=True)
@@ -77,7 +76,7 @@ def main() -> int:
 
     state = FlagState(args.expected_run_id, Path(args.evidence_dir))
     server = HTTPServer((args.host, args.port), Handler)
-    server.state = state  # type: ignore[attr-defined]
+    server.state = state
     server.timeout = 1
     deadline = time.monotonic() + args.timeout
     print(f"Listening for flag callback on {args.host}:{args.port}", flush=True)

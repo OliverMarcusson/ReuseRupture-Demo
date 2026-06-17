@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 """setup.py."""
 
-from __future__ import annotations
-
 import argparse
-import getpass
-import os
-import shlex
 import shutil
 import subprocess
-import sys
 
 from scripts.rrlib import (
     ROOT,
     banner,
+    configure_compose_env,
     cfg_path,
     docker_compose,
     download_url,
@@ -33,9 +28,21 @@ from scripts.rrlib import (
 # Commands setup.py needs on the host. If they are all present we skip package
 # installation entirely.
 REQUIRED_COMMANDS = [
-    "python3", "pip3", "ansible", "ansible-galaxy", "ansible-playbook",
-    "docker", "virsh", "virt-install", "virt-xml", "qemu-img",
-    "curl", "sha256sum", "xorriso", "cpio", "gzip", "aria2c",
+    "python3",
+    "pip3",
+    "ansible",
+    "ansible-galaxy",
+    "ansible-playbook",
+    "docker",
+    "virsh",
+    "virt-install",
+    "virt-xml",
+    "qemu-img",
+    "curl",
+    "xorriso",
+    "cpio",
+    "gzip",
+    "aria2c",
 ]
 
 # Per-distro package sets, keyed by the package-manager binary we detect.
@@ -55,12 +62,26 @@ PACKAGE_MANAGERS = {
         "install": ["apt-get", "install", "-y"],
         "available": ["apt-cache", "show"],
         "packages": [
-            "acl", "ansible", "coreutils", "cpio", "curl", "docker.io",
+            "ansible",
+            "coreutils",
+            "cpio",
+            "curl",
+            "docker.io",
             ("docker-compose-v2", "docker-compose-plugin", "docker-compose"),
-            ("freerdp3-x11", "freerdp2-x11"), "gzip", "libvirt-clients",
-            "libvirt-daemon-system", "python3", "python3-pip", "python3-winrm",
-            "python3-yaml", ("qemu-system-x86", "qemu-kvm"), "qemu-utils",
-            "sshpass", "virtinst", "xorriso", "aria2",
+            ("freerdp3-x11", "freerdp2-x11"),
+            "gzip",
+            "libvirt-clients",
+            "libvirt-daemon-system",
+            "python3",
+            "python3-pip",
+            "python3-winrm",
+            "python3-yaml",
+            ("qemu-system-x86", "qemu-kvm"),
+            "qemu-utils",
+            "sshpass",
+            "virtinst",
+            "xorriso",
+            "aria2",
         ],
     },
     "dnf": {
@@ -68,11 +89,25 @@ PACKAGE_MANAGERS = {
         "install": ["dnf", "install", "-y"],
         "available": ["dnf", "list"],
         "packages": [
-            "acl", "ansible", "coreutils", "cpio", "curl", "docker",
-            ("docker-compose", "docker-compose-plugin"), "freerdp", "gzip",
-            "libvirt", "python3", "python3-pip", "python3-winrm",
-            "python3-PyYAML", "qemu-img", "qemu-kvm", "sshpass",
-            "virt-install", "xorriso", "aria2",
+            "ansible",
+            "coreutils",
+            "cpio",
+            "curl",
+            "docker",
+            ("docker-compose", "docker-compose-plugin"),
+            "freerdp",
+            "gzip",
+            "libvirt",
+            "python3",
+            "python3-pip",
+            "python3-winrm",
+            "python3-PyYAML",
+            "qemu-img",
+            "qemu-kvm",
+            "sshpass",
+            "virt-install",
+            "xorriso",
+            "aria2",
         ],
     },
     "pacman": {
@@ -80,16 +115,33 @@ PACKAGE_MANAGERS = {
         "install": ["pacman", "-S", "--needed", "--noconfirm"],
         "available": ["pacman", "-Si"],
         "packages": [
-            "acl", "ansible", "coreutils", "cpio", "curl", "docker", "docker-compose",
-            "freerdp", "gzip", "libvirt", "libvirt-glib", "make", "gcc",
-            "python", "python-pip", "python-pywinrm", "python-yaml",
-            "qemu-desktop", "sshpass", "virt-install", "xorriso", "aria2",
+            "ansible",
+            "coreutils",
+            "cpio",
+            "curl",
+            "docker",
+            "docker-compose",
+            "freerdp",
+            "gzip",
+            "libvirt",
+            "libvirt-glib",
+            "make",
+            "gcc",
+            "python",
+            "python-pip",
+            "python-pywinrm",
+            "python-yaml",
+            "qemu-desktop",
+            "sshpass",
+            "virt-install",
+            "xorriso",
+            "aria2",
         ],
     },
 }
 
 
-def resolve_packages(spec: dict) -> tuple[list[str], list[str]]:
+def resolve_packages(spec):
     """Resolve the package list against what this package manager can install.
 
     Returns ``(to_install, skipped)``. For tuple entries the first installable
@@ -97,16 +149,19 @@ def resolve_packages(spec: dict) -> tuple[list[str], list[str]]:
     skipped instead of aborting the whole install.
     """
     test = spec.get("available")
-    to_install: list[str] = []
-    skipped: list[str] = []
+    to_install = []
+    skipped = []
     for entry in spec["packages"]:
         candidates = [entry] if isinstance(entry, str) else list(entry)
         if test is None:
             to_install.append(candidates[0])
             continue
         chosen = next(
-            (c for c in candidates
-             if run([*test, c], check=False, capture=True).returncode == 0),
+            (
+                c
+                for c in candidates
+                if run([*test, c], check=False, capture=True).returncode == 0
+            ),
             None,
         )
         if chosen is not None:
@@ -116,7 +171,7 @@ def resolve_packages(spec: dict) -> tuple[list[str], list[str]]:
     return to_install, skipped
 
 
-def install_host_dependencies() -> None:
+def install_host_dependencies():
     step("Checking host dependencies")
     if require_cmds(REQUIRED_COMMANDS):
         ok("Host dependencies are already installed")
@@ -131,13 +186,23 @@ def install_host_dependencies() -> None:
 
         packages, skipped = resolve_packages(spec)
         if skipped:
-            warn("Skipping packages not available in this distro's repositories: " + ", ".join(skipped))
-            warn("If a later step reports a missing tool, install the equivalent package manually.")
+            warn(
+                "Skipping packages not available in this distro's repositories: "
+                + ", ".join(skipped)
+            )
+            warn(
+                "If a later step reports a missing tool, install the equivalent package manually."
+            )
 
-        if packages and run([*spec["install"], *packages], sudo=True, check=False).returncode != 0:
+        if (
+            packages
+            and run([*spec["install"], *packages], sudo=True, check=False).returncode
+            != 0
+        ):
             warn("Batch package install failed; retrying packages individually.")
             failed = [
-                pkg for pkg in packages
+                pkg
+                for pkg in packages
                 if run([*spec["install"], pkg], sudo=True, check=False).returncode != 0
             ]
             if failed:
@@ -156,7 +221,7 @@ def install_host_dependencies() -> None:
         warn("Install the equivalents for your distribution, then rerun ./setup.py.")
 
 
-def ensure_virtio_iso() -> None:
+def ensure_virtio_iso():
     cfg = load_config()
     virtio = cfg.get("windows", {}).get("virtio", {})
     if not virtio.get("enabled", True):
@@ -167,13 +232,15 @@ def ensure_virtio_iso() -> None:
         ok(f"VirtIO ISO already present: {iso}")
         return
     if not virtio.get("download_iso", True):
-        raise SystemExit(f"VirtIO ISO is missing and windows.virtio.download_iso is false: {iso}")
+        raise SystemExit(
+            f"VirtIO ISO is missing and windows.virtio.download_iso is false: {iso}"
+        )
     step("Downloading VirtIO Windows driver ISO")
-    download_url(str(virtio["iso_url"]), iso, str(virtio.get("iso_sha256") or ""))
+    download_url(str(virtio["iso_url"]), iso)
     ok(f"VirtIO ISO downloaded: {iso}")
 
 
-def prepare_workspace_dirs() -> None:
+def prepare_workspace_dirs():
     cfg = load_config()
     step("Preparing writable workspace directories")
     ensure_repo_writable_dir(ROOT / cfg["demo"]["evidence_root"])
@@ -183,100 +250,55 @@ def prepare_workspace_dirs() -> None:
     ok("Workspace directories are writable")
 
 
-def start_docker_services() -> None:
+def start_docker_services():
     if not shutil.which("systemctl"):
         return
     step("Starting Docker service")
     run(["systemctl", "enable", "--now", "docker.service"], check=False, sudo=True)
-    ensure_docker_access()
     ok("Docker service startup attempted")
 
 
-def docker_group_members() -> set[str]:
-    """Return the set of users listed in the `docker` group (from /etc/group)."""
-    result = run(["getent", "group", "docker"], check=False, capture=True)
-    if result.returncode != 0 or not result.stdout.strip():
-        return set()
-    # getent format: docker:x:999:user1,user2
-    return {m for m in result.stdout.strip().split(":")[-1].split(",") if m}
-
-
-def ensure_docker_access() -> None:
-    """Make sure the invoking user can use Docker without sudo.
-
-    A fresh Docker install leaves the user outside the `docker` group, so the
-    unprivileged client hits 'permission denied' on the socket. We add the user
-    and *verify* the membership actually stuck (the add can silently no-op if the
-    group is missing or sudo fails). Group changes do not affect already-running
-    sessions, and on Ubuntu logging out and back in is frequently not enough —
-    the graphical/systemd user session lingers — so a reboot is the reliable
-    way to apply it. For the current run we re-exec once under `sg docker` so
-    setup proceeds without sudo or any re-login.
-    """
-    if not shutil.which("docker"):
-        return
-
-    user = os.environ.get("SUDO_USER") or getpass.getuser()
-
-    if user not in docker_group_members():
-        step(f"Adding {user} to the 'docker' group")
-        run(["groupadd", "-f", "docker"], check=False, sudo=True)
-        run(["usermod", "-aG", "docker", user], check=False, sudo=True)
-        if user not in docker_group_members():
-            warn(f"Could not add {user} to the 'docker' group. Configure Docker access manually:")
-            warn(f"  sudo groupadd -f docker && sudo usermod -aG docker {user}")
-            return
-        ok(f"{user} added to the 'docker' group")
-        warn("REBOOT to use Docker as your user. Logging out and back in is often NOT")
-        warn("enough on Ubuntu; a reboot reliably applies the new group membership.")
-
-    # Membership is set in /etc/group. If this process can already reach the
-    # daemon, nothing more is needed.
-    if run(["docker", "info"], check=False, capture=True).returncode == 0:
-        return
-
-    # Not active in this session yet. Re-exec once under the group so this run
-    # works now. The env flag prevents an infinite re-exec loop.
-    if os.environ.get("RR_DOCKER_GROUP_REEXEC") != "1" and shutil.which("sg"):
-        info("Applying the 'docker' group for this run (via sg docker)")
-        inner = shlex.join([sys.executable, *sys.argv])
-        os.execvp("sg", ["sg", "docker", "-c", f"RR_DOCKER_GROUP_REEXEC=1 exec {inner}"])
-
-    # Fallback: no `sg`, or the re-exec did not gain access. Docker calls use
-    # sudo automatically this run (see rrlib.docker_prefix).
-    warn("Docker group membership is set but not active in this session;")
-    warn("this run falls back to sudo for Docker. Reboot to avoid this next time.")
-
-
-def prepare_attacker_container() -> None:
+def prepare_attacker_container():
     cfg = load_config()
+    configure_compose_env(cfg)
     step("Building and starting Docker attacker")
     docker_compose(["up", "-d", "--build", "attacker"])
-    host_line = f"{cfg['windows']['ip']} {cfg['windows']['hostname']} {cfg['windows']['hostname']}.{cfg['active_directory']['domain_name']}"
-    docker_compose(["exec", "-T", "attacker", "sh", "-c", f"grep -q ' {cfg['windows']['hostname']}\\.' /etc/hosts || echo '{host_line}' >> /etc/hosts"])
-    check = docker_compose(["exec", "-T", "attacker", "reuserupture", "--help"], check=False, capture=True)
+    check = docker_compose(
+        ["exec", "-T", "attacker", "reuserupture", "--help"], check=False, capture=True
+    )
     if check.returncode != 0:
         warn((check.stdout + check.stderr).strip())
         raise SystemExit("Attacker container started, but reuserupture --help failed.")
     ok("Docker attacker is ready")
 
 
-def start_libvirt_services() -> None:
+def start_libvirt_services():
     if not shutil.which("systemctl"):
         return
     step("Starting libvirt services")
     units = [
-        "libvirtd.service", "virtqemud.service", "virtqemud.socket",
-        "virtnetworkd.service", "virtnetworkd.socket", "virtstoraged.service",
-        "virtstoraged.socket", "virtlogd.service", "virtlogd.socket",
+        "libvirtd.service",
+        "virtqemud.service",
+        "virtqemud.socket",
+        "virtnetworkd.service",
+        "virtnetworkd.socket",
+        "virtstoraged.service",
+        "virtstoraged.socket",
+        "virtlogd.service",
+        "virtlogd.socket",
     ]
     for unit in units:
-        if run(["systemctl", "list-unit-files", unit], check=False, capture=True).returncode == 0:
+        if (
+            run(
+                ["systemctl", "list-unit-files", unit], check=False, capture=True
+            ).returncode
+            == 0
+        ):
             run(["systemctl", "enable", "--now", unit], check=False, sudo=True)
     ok("Libvirt service startup attempted")
 
 
-def wait_for_management_services() -> int:
+def wait_for_management_services():
     step("Waiting for VM management services")
     checks = [
         ("Windows WinRM", ROOT / "vm/wait-for-windows.py"),
@@ -297,14 +319,17 @@ def wait_for_management_services() -> int:
     return 0
 
 
-def main() -> int:
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-vm-creation", action="store_true")
     parser.add_argument("--ansible-only", action="store_true")
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
 
-    banner("ReuseRupture Lab Setup", "This prepares the VMs, Active Directory, attack tooling, and flag callback.")
+    banner(
+        "ReuseRupture Lab Setup",
+        "This prepares the VMs, Active Directory, attack tooling, and flag callback.",
+    )
     ensure_config_exists()
     prepare_workspace_dirs()
     install_host_dependencies()
@@ -324,7 +349,9 @@ def main() -> int:
         step("Creating or reusing lab VM")
         result = run([str(ROOT / "vm/create-lab.py")], check=False)
         if result.returncode != 0:
-            warn("VM setup failed. Inspect the VM state with 'virsh -c qemu:///system list --all' and rerun ./setup.py when ready.")
+            warn(
+                "VM setup failed. Inspect the VM state with 'virsh -c qemu:///system list --all' and rerun ./setup.py when ready."
+            )
             return result.returncode
     else:
         info("Skipping VM creation")
@@ -336,9 +363,24 @@ def main() -> int:
 
     try:
         step("Installing required Ansible collections")
-        run(["ansible-galaxy", "collection", "install", "-r", str(ROOT / "requirements.yml")])
+        run(
+            [
+                "ansible-galaxy",
+                "collection",
+                "install",
+                "-r",
+                str(ROOT / "requirements.yml"),
+            ]
+        )
         step("Running Ansible lab configuration")
-        run(["ansible-playbook", "-i", str(ROOT / "inventory/hosts.yml"), str(ROOT / "playbooks/site.yml")])
+        run(
+            [
+                "ansible-playbook",
+                "-i",
+                str(ROOT / "inventory/hosts.yml"),
+                str(ROOT / "playbooks/site.yml"),
+            ]
+        )
         step("Running final lab verification")
         rc = run([str(ROOT / "scripts/verify-lab.py")], check=False).returncode
     except subprocess.CalledProcessError as exc:
@@ -348,7 +390,10 @@ def main() -> int:
     if rc == 0:
         banner("Setup Complete", "Start the demonstration with: ./demo.py --yes")
     else:
-        banner("Setup Finished With Verification Failures", "Review the failed checks above before running the demo.")
+        banner(
+            "Setup Finished With Verification Failures",
+            "Review the failed checks above before running the demo.",
+        )
     return rc
 
 

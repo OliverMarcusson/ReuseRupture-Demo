@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """scripts/collect-evidence.py."""
 
-from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
@@ -10,7 +9,7 @@ from pathlib import Path
 from rrlib import ROOT, attacker_exec, ensure_repo_writable_dir, load_config, redacted_config_json, render_inventory, run
 
 
-def main() -> int:
+def main():
     config = load_config()
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     default_output = ROOT / config["demo"]["evidence_root"] / f"manual-{timestamp}"

@@ -164,7 +164,7 @@ the host `evidence/` directory into `/opt/reuserupture/evidence`.
 
 Windows is installed from `windows.iso_path`. If that file is missing and
 `windows.download_iso` is true, setup downloads the configured Google Drive
-evaluation ISO. Set `windows.iso_sha256` when you know the trusted checksum.
+evaluation ISO.
 
 Windows unattended installation varies by ISO and VirtIO driver setup. The
 reference `vm/autounattend/Autounattend.xml` is included, but if installation

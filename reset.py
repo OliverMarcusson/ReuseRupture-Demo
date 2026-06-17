@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """reset.py."""
 
-from __future__ import annotations
 
-from scripts.rrlib import ROOT, banner, docker_compose, info, load_config, run, step, virsh
+from scripts.rrlib import ROOT, banner, configure_compose_env, docker_compose, info, load_config, run, step, virsh
 
 
-def restore_snapshot(vm_name: str, snapshot_name: str) -> None:
+def restore_snapshot(vm_name, snapshot_name):
     if virsh(["dominfo", vm_name], check=False).returncode != 0:
         info(f"VM {vm_name} does not exist; cannot restore snapshot.")
         return
@@ -16,8 +15,9 @@ def restore_snapshot(vm_name: str, snapshot_name: str) -> None:
     virsh(["snapshot-revert", vm_name, snapshot_name, "--running"])
 
 
-def main() -> int:
+def main():
     config = load_config()
+    configure_compose_env(config)
     banner("ReuseRupture Reset", "Restoring the clean lab snapshot and verifying readiness.")
     snapshot_name = config["demo"]["snapshot_name"]
 

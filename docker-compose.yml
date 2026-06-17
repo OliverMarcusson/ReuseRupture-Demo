@@ -7,6 +7,10 @@ services:
     hostname: ATTACKER01
     network_mode: host
     working_dir: /opt/reuserupture
+    user: "${RR_UID:-1000}:${RR_GID:-1000}"
+    extra_hosts:
+      - "${RR_WINDOWS_HOSTNAME:-DC01}:${RR_WINDOWS_IP:-192.168.56.10}"
+      - "${RR_WINDOWS_FQDN:-DC01.reuserupture.local}:${RR_WINDOWS_IP:-192.168.56.10}"
     tty: true
     stdin_open: true
     volumes:
