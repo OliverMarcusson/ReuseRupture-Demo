@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 from xml.sax.saxutils import escape
 
-from scripts.rrlib import ROOT, cfg_path, download_url, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, set_domain_interface_model, stage_libvirt_media, step, virt_install, virsh, warn
+from scripts.rrlib import ROOT, cfg_path, download_url, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, set_domain_interface_model, stage_libvirt_media, step, virt_install, virsh, warn, windows_nic_model
 
 VIRTIO_DRIVER_SPECS = {
     "viostor": "viostor.inf",
@@ -157,7 +157,7 @@ def main():
     if virsh(["dominfo", win["vm_name"]], check=False, capture=True).returncode == 0:
         ok(f"Windows VM {win['vm_name']} already exists; reusing it")
         set_domain_boot_to_disk(win["vm_name"])
-        desired_model = "virtio" if use_virtio_devices else "e1000e"
+        desired_model = windows_nic_model(cfg)
         if set_domain_interface_model(win["vm_name"], desired_model):
             warn(f"Existing Windows VM network model was changed to {desired_model}.")
             warn("If WinRM still does not answer, fully power off and start the VM once.")
@@ -227,7 +227,7 @@ def main():
         step("Creating Windows VM disk")
         run(["qemu-img", "create", "-f", "qcow2", str(disk), f"{win['disk_gb']}G"], sudo=True)
     disk_bus = "virtio" if use_virtio_devices else "sata"
-    nic_model = "virtio" if use_virtio_devices else "e1000e"
+    nic_model = windows_nic_model(cfg)
     staged_iso = stage_libvirt_media(iso)
     staged_answer_iso = stage_libvirt_media(answer_iso)
 

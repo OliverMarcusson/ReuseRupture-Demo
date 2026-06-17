@@ -16,6 +16,7 @@ from scripts.rrlib import (
     banner,
     configure_compose_env,
     container_path,
+    cold_boot_domain,
     demo_auth_target,
     docker_compose,
     ensure_domain_running,
@@ -28,9 +29,11 @@ from scripts.rrlib import (
     render_inventory,
     run,
     set_domain_boot_to_disk,
+    set_domain_interface_model,
     step,
     utc_stamp,
     wait_for_tcp,
+    windows_nic_model,
 )
 
 
@@ -180,7 +183,10 @@ def start_existing_lab(config):
 
     step("Starting Windows VM")
     set_domain_boot_to_disk(config["windows"]["vm_name"])
-    ensure_domain_running(config["windows"]["vm_name"])
+    if set_domain_interface_model(config["windows"]["vm_name"], windows_nic_model(config)):
+        cold_boot_domain(config["windows"]["vm_name"])
+    else:
+        ensure_domain_running(config["windows"]["vm_name"])
 
 
 def main():

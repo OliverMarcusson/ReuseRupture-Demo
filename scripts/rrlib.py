@@ -236,6 +236,12 @@ def demo_auth_target(config):
     return f"{ad['domain_name']}/{ad['demo_username']}:{ad['demo_password']}@{config['windows']['ip']}"
 
 
+def windows_nic_model(config):
+    """Return the libvirt NIC model implied by windows.virtio.enabled."""
+    virtio = config.get("windows", {}).get("virtio", {})
+    return "virtio" if virtio.get("enabled", True) else "e1000e"
+
+
 def download_url(url, output):
     try:
         output.parent.resolve().relative_to(ROOT)
