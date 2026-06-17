@@ -1,10 +1,10 @@
 # Architecture
 
-ReuseRupture uses one isolated libvirt network, one Kali attacker VM, and one
-Windows Server 2025 domain controller VM.
+ReuseRupture uses one isolated libvirt network, a Docker attacker container, and
+one Windows Server 2025 domain controller VM.
 
 ```text
-Kali ATTACKER01 192.168.56.20
+ATTACKER01 (Docker container, host network)
   -> authenticated SAMR scan
   -> authenticated SAMR exploit
 

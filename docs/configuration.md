@@ -12,11 +12,8 @@ Important values:
 - `windows.download_iso`, `windows.iso_url`, `windows.iso_sha256`: Windows ISO
   download/cache/verification settings. If `windows.iso_path` exists locally,
   setup uses it and skips download.
-- `kali.image_path`: optional prepared Kali qcow2 import path.
-- `kali.iso_path`, `kali.iso_url`, `kali.iso_sha256`: Kali installer ISO
-  cache/download/verification settings used when `kali.image_path` is empty.
 - `windows.interface_alias`: Windows interface name, usually `Ethernet`.
-- `windows.memory_mb`, `windows.vcpus`, `kali.memory_mb`, `kali.vcpus`:
+- `windows.memory_mb`, `windows.vcpus`:
   set to `auto` for host-aware sizing, or use explicit numbers to force fixed
   resources.
 - `active_directory.*`: domain name and demo users.

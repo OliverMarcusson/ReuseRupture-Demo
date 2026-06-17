@@ -1,6 +1,0 @@
----
-- name: Configure ReuseRupture Kali attacker
-  hosts: attacker
-  gather_facts: true
-  roles:
-    - attacker

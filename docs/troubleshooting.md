@@ -62,12 +62,6 @@ If `windows.iso_path` exists, setup uses it and skips download. If it does not
 exist, keep `windows.download_iso: true` to fetch the configured Google Drive
 ISO, or set `windows.iso_path` to a valid local file.
 
-## Kali ISO Download Or Verification Errors
-
-When `kali.image_path` is empty, `setup.py` downloads `kali.iso_url` to
-`kali.iso_path` and checks `kali.iso_sha256`. If the checksum fails, delete the
-partial ISO and verify the current official value on `https://www.kali.org/get-kali/`.
-
 ## Unattended Windows Installation Fails
 
 Error `0x80070103 - 0x40031` during Windows PE is `ERROR_NO_MORE_ITEMS`
@@ -97,11 +91,6 @@ the generated `Autounattend.xml` fixes this; recreate the VM with
 If Windows setup still fails, use `vm/autounattend/Autounattend.xml` as a
 reference, finish setup manually, enable WinRM, then run
 `./setup.py --skip-vm-creation`.
-
-## SSH Failures
-
-Confirm the Kali VM has IP `192.168.56.20`, SSH enabled, and credentials from
-`config.yml`.
 
 ## WinRM Failures
 
@@ -134,12 +123,12 @@ Wait several minutes after promotion, then rerun `./setup.py --ansible-only`.
 
 ## DNS Failures
 
-Check that Kali uses `192.168.56.10` as DNS and that `/etc/hosts` contains the
-fallback `DC01.reuserupture.local` entry.
+Check that the attacker container uses `192.168.56.10` as DNS and that
+`/etc/hosts` contains the fallback `DC01.reuserupture.local` entry.
 
 ## Kerberos Clock Skew
 
-Synchronize host, Kali, and Windows clocks. Kerberos commonly fails with more
+Synchronize the host and Windows clocks. Kerberos commonly fails with more
 than five minutes of skew.
 
 ## Scanner Errors
@@ -157,7 +146,7 @@ Confirm the scanner reported vulnerable behavior before exploit. Check
 
 ## DC Reboots But No Flag Arrives
 
-Check `C:\ReuseRuptureDemo\flag-callback.log`, Windows Firewall, Kali listener
+Check `C:\ReuseRuptureDemo\flag-callback.log`, Windows Firewall, the listener
 port, and `C:\ReuseRuptureDemo\armed-run-id.txt`.
 
 ## Listener Port Conflicts
