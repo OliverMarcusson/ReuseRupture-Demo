@@ -32,7 +32,7 @@ from scripts.rrlib import (
     set_domain_interface_model,
     step,
     utc_stamp,
-    wait_for_tcp,
+    wait_for_vm_tcp,
     windows_nic_model,
 )
 
@@ -183,10 +183,35 @@ def start_existing_lab(config):
 
     step("Starting Windows VM")
     set_domain_boot_to_disk(config["windows"]["vm_name"])
-    if set_domain_interface_model(config["windows"]["vm_name"], windows_nic_model(config)):
-        cold_boot_domain(config["windows"]["vm_name"])
-    else:
-        ensure_domain_running(config["windows"]["vm_name"])
+    ensure_domain_running(config["windows"]["vm_name"])
+
+
+def wait_for_winrm(config):
+    vm_name = config["windows"]["vm_name"]
+    ip = config["windows"]["ip"]
+    port = int(config["windows"]["winrm_port"])
+    timeout = int(config["demo"]["reboot_timeout_seconds"])
+
+    if wait_for_vm_tcp(vm_name, ip, port, min(180, timeout), boot_from_disk=True):
+        return True
+
+    configured_model = windows_nic_model(config)
+    alternate_model = "e1000e" if configured_model == "virtio" else "virtio"
+
+    for model in [configured_model, alternate_model]:
+        step(f"Trying Windows VM network adapter model {model}")
+        set_domain_boot_to_disk(vm_name)
+        set_domain_interface_model(vm_name, model)
+        cold_boot_domain(vm_name)
+        if wait_for_vm_tcp(vm_name, ip, port, timeout, boot_from_disk=True):
+            if model != configured_model:
+                info(
+                    f"WinRM answered with {model}; update windows.virtio.enabled "
+                    "in config.yml if this is the stable adapter for this VM."
+                )
+            return True
+
+    return False
 
 
 def main():
@@ -212,7 +237,7 @@ def main():
     if attacker_check.returncode != 0:
         info((attacker_check.stdout + attacker_check.stderr).strip())
         return 1
-    if not wait_for_tcp(config["windows"]["ip"], int(config["windows"]["winrm_port"]), 180):
+    if not wait_for_winrm(config):
         return 1
 
     step("Verifying lab readiness")

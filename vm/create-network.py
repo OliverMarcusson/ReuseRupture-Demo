@@ -11,9 +11,11 @@ from scripts.rrlib import info, load_config, ok, virsh
 def main():
     cfg = load_config()
     name = cfg["network"]["name"]
-    if virsh(["net-info", name], check=False, capture=True).returncode == 0:
+    existing = virsh(["net-info", name], check=False, capture=True)
+    if existing.returncode == 0:
         info(f"Network {name} already exists; reusing it")
-        virsh(["net-start", name], check=False)
+        if "Active: yes" not in existing.stdout:
+            virsh(["net-start", name], check=False)
         virsh(["net-autostart", name])
         ok(f"Network {name} is active")
         return 0
