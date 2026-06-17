@@ -175,6 +175,9 @@ def main() -> int:
             warn("Falling back to the configured download URL so setup can continue.")
         step("Downloading Windows Server evaluation ISO")
         info(win["iso_url"])
+        info("This is a multi-gigabyte download and may take many minutes; aria2 reports progress below.")
+        info(f"Saving to: {iso}")
+        info("To skip this, cancel and set windows.iso_path to a local ISO with windows.download_iso: false.")
         try:
             run([str(ROOT / "scripts/download-google-drive-file.py"), "--url", win["iso_url"], "--output", str(iso), "--sha256", str(win.get("iso_sha256") or "")])
         except subprocess.CalledProcessError as exc:

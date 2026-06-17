@@ -149,7 +149,13 @@ def download_url(url: str, output: Path, expected_sha256: str = "") -> None:
     tmp = output.with_suffix(output.suffix + ".part")
     downloader = ["curl", "-L", "--fail", "--progress-bar", "-o", str(tmp), url]
     if command_exists("aria2c"):
-        downloader = ["aria2c", "--allow-overwrite=true", "--file-allocation=none", "-o", tmp.name, "-d", str(tmp.parent), url]
+        downloader = [
+            "aria2c", "--allow-overwrite=true", "--file-allocation=none",
+            # Periodic progress even when stdout is not a TTY, so large
+            # downloads never look like a hang.
+            "--summary-interval=5", "--console-log-level=notice", "--human-readable=true",
+            "-o", tmp.name, "-d", str(tmp.parent), url,
+        ]
     run(downloader)
     if expected_sha256:
         actual = sha256_file(tmp)
