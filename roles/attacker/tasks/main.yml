@@ -103,6 +103,12 @@
     mode: preserve
   become: true
 
+- name: Install uv (used instead of pip for dependency installation)
+  ansible.builtin.shell:
+    cmd: "curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin INSTALLER_NO_MODIFY_PATH=1 sh"
+    creates: /usr/local/bin/uv
+  become: true
+
 - name: Create tool virtual environment
   ansible.builtin.command:
     cmd: python3 -m venv /opt/reuserupture/.venv
@@ -110,10 +116,12 @@
   become: true
 
 - name: Install Python tool dependencies
-  ansible.builtin.pip:
-    requirements: /opt/reuserupture/tool/requirements.txt
-    virtualenv: /opt/reuserupture/.venv
-    extra_args: "--no-index --find-links /opt/reuserupture/wheelhouse/tool"
+  ansible.builtin.command:
+    cmd: >-
+      uv pip install
+      --python /opt/reuserupture/.venv/bin/python
+      --no-index --find-links /opt/reuserupture/wheelhouse/tool
+      -r /opt/reuserupture/tool/requirements.txt
   become: true
 
 - name: Install convenience launcher
