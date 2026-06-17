@@ -29,15 +29,10 @@ RUN apt-get update \
         tshark \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv (used instead of pip for dependency installation).
-ADD https://astral.sh/uv/install.sh /uv-installer.sh
-RUN sh /uv-installer.sh && rm /uv-installer.sh
-ENV PATH=/root/.local/bin:$PATH
-
 WORKDIR /opt/reuserupture
 
 COPY tool/requirements.txt /tmp/reuserupture-requirements.txt
 RUN python3 -m venv /opt/reuserupture-venv \
-    && uv pip install --python /opt/reuserupture-venv/bin/python -r /tmp/reuserupture-requirements.txt \
+    && /opt/reuserupture-venv/bin/python -m pip install --no-cache-dir -r /tmp/reuserupture-requirements.txt \
     && printf '#!/usr/bin/env bash\nexec /opt/reuserupture-venv/bin/python /opt/reuserupture/tool/reuserupture.py "$@"\n' > /usr/local/bin/reuserupture \
     && chmod 0755 /usr/local/bin/reuserupture

@@ -1,11 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S PYTHONPATH=. python3
 """vm/create-lab.py."""
 
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.rrlib import ROOT, load_config, ok, run, step, virsh
 
 

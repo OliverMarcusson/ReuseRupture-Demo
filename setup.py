@@ -2,6 +2,7 @@
 """setup.py."""
 
 import argparse
+import importlib.util
 import shutil
 import subprocess
 
@@ -18,7 +19,7 @@ from scripts.rrlib import (
     load_config,
     ok,
     render_inventory,
-    require_cmds,
+    missing_cmds,
     run,
     step,
     warn,
@@ -29,7 +30,6 @@ from scripts.rrlib import (
 # installation entirely.
 REQUIRED_COMMANDS = [
     "python3",
-    "pip3",
     "ansible",
     "ansible-galaxy",
     "ansible-playbook",
@@ -43,6 +43,11 @@ REQUIRED_COMMANDS = [
     "cpio",
     "gzip",
     "aria2c",
+]
+
+REQUIRED_PYTHON_MODULES = [
+    "yaml",
+    "winrm",
 ]
 
 # Per-distro package sets, keyed by the package-manager binary we detect.
@@ -73,7 +78,6 @@ PACKAGE_MANAGERS = {
             "libvirt-clients",
             "libvirt-daemon-system",
             "python3",
-            "python3-pip",
             "python3-winrm",
             "python3-yaml",
             ("qemu-system-x86", "qemu-kvm"),
@@ -99,7 +103,6 @@ PACKAGE_MANAGERS = {
             "gzip",
             "libvirt",
             "python3",
-            "python3-pip",
             "python3-winrm",
             "python3-PyYAML",
             "qemu-img",
@@ -128,7 +131,6 @@ PACKAGE_MANAGERS = {
             "make",
             "gcc",
             "python",
-            "python-pip",
             "python-pywinrm",
             "python-yaml",
             "qemu-desktop",
@@ -171,9 +173,20 @@ def resolve_packages(spec):
     return to_install, skipped
 
 
+def missing_python_modules(modules):
+    missing = []
+    for module in modules:
+        if importlib.util.find_spec(module) is None:
+            print(f"Missing required Python module: {module}")
+            missing.append(module)
+    return missing
+
+
 def install_host_dependencies():
     step("Checking host dependencies")
-    if require_cmds(REQUIRED_COMMANDS):
+    initial_missing_commands = missing_cmds(REQUIRED_COMMANDS)
+    initial_missing_modules = missing_python_modules(REQUIRED_PYTHON_MODULES)
+    if not initial_missing_commands and not initial_missing_modules:
         ok("Host dependencies are already installed")
         return
 
@@ -214,11 +227,21 @@ def install_host_dependencies():
             "virt-install, Ansible, PyYAML, curl, xorriso, cpio, gzip."
         )
 
-    if require_cmds(REQUIRED_COMMANDS):
+    missing = missing_cmds(REQUIRED_COMMANDS)
+    missing_modules = missing_python_modules(REQUIRED_PYTHON_MODULES)
+    if not missing and not missing_modules:
         ok("Host dependencies installed")
     else:
-        warn("Some required commands are still missing after package installation.")
-        warn("Install the equivalents for your distribution, then rerun ./setup.py.")
+        details = []
+        if missing:
+            details.append("commands: " + ", ".join(missing))
+        if missing_modules:
+            details.append("Python modules: " + ", ".join(missing_modules))
+        raise SystemExit(
+            "Required dependencies are still missing after package installation: "
+            + "; ".join(details)
+            + "\nInstall the equivalents for your distribution, then rerun ./setup.py."
+        )
 
 
 def ensure_virtio_iso():
@@ -331,8 +354,8 @@ def main():
         "This prepares the VMs, Active Directory, attack tooling, and flag callback.",
     )
     ensure_config_exists()
-    prepare_workspace_dirs()
     install_host_dependencies()
+    prepare_workspace_dirs()
     start_docker_services()
     start_libvirt_services()
 

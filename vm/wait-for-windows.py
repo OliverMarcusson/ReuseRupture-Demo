@@ -1,11 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S PYTHONPATH=. python3
 """vm/wait-for-windows.py."""
 
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.rrlib import ensure_domain_running, load_config, set_domain_boot_to_disk, set_domain_interface_model, wait_for_vm_tcp, warn
 
 

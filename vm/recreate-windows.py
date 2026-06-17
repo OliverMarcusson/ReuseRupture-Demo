@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S PYTHONPATH=. python3
 """Recreate only the Windows VM, preserving attacker container state and cached ISOs."""
 
 
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.rrlib import ROOT, banner, load_config, run, step, virsh, warn
 
 

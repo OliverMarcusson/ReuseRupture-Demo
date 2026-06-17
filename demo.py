@@ -14,8 +14,11 @@ from scripts.rrlib import (
     ROOT,
     attacker_cmd,
     banner,
+    configure_compose_env,
     container_path,
     demo_auth_target,
+    docker_compose,
+    ensure_domain_running,
     ensure_repo_writable_dir,
     info,
     load_config,
@@ -24,6 +27,7 @@ from scripts.rrlib import (
     redacted_config_json,
     render_inventory,
     run,
+    set_domain_boot_to_disk,
     step,
     utc_stamp,
     wait_for_tcp,
@@ -165,6 +169,20 @@ def show_dc_callback_log(evidence_dir):
         info("DC confirms: " + lines[-1].strip())
 
 
+def start_existing_lab(config):
+    """Start already-created demo services without rebuilding the lab."""
+    configure_compose_env(config)
+    step("Starting attacker container")
+    docker_compose(["up", "-d", "attacker"])
+
+    step("Starting libvirt network")
+    run([str(ROOT / "vm/create-network.py")])
+
+    step("Starting Windows VM")
+    set_domain_boot_to_disk(config["windows"]["vm_name"])
+    ensure_domain_running(config["windows"]["vm_name"])
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--yes", action="store_true")
@@ -178,6 +196,7 @@ def main():
     banner("ReuseRupture Demo", "Scan, exploit, observe reboot, and wait for the armed flag callback.")
     config = load_config()
     render_inventory()
+    start_existing_lab(config)
 
     run_id = secrets.token_hex(4)
     evidence_dir = prepare_evidence_dir(config, run_id)

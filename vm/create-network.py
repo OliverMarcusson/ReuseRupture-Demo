@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S PYTHONPATH=. python3
 """vm/create-network.py."""
 
 
 import tempfile
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.rrlib import info, load_config, ok, virsh
 
 
@@ -29,7 +27,10 @@ def main():
     with tempfile.NamedTemporaryFile("w", delete=False) as fh:
         fh.write(xml)
         path = fh.name
-    virsh(["net-define", path])
+    try:
+        virsh(["net-define", path])
+    finally:
+        Path(path).unlink(missing_ok=True)
     virsh(["net-start", name])
     virsh(["net-autostart", name])
     ok(f"Network {name} created and marked autostart")

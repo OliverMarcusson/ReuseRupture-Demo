@@ -14,9 +14,6 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yaml
-
-
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_FILE = Path(os.environ.get("CONFIG_FILE", ROOT / "config.yml"))
 LIBVIRT_URI = os.environ.get("RR_LIBVIRT_URI", "qemu:///system")
@@ -65,6 +62,12 @@ def run(
         "text": True,
         "check": check,
     }
+    env = os.environ.copy()
+    pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        str(ROOT) if not pythonpath else str(ROOT) + os.pathsep + pythonpath
+    )
+    kwargs["env"] = env
     if capture:
         kwargs["stdout"] = subprocess.PIPE
         kwargs["stderr"] = subprocess.PIPE
@@ -106,12 +109,16 @@ def command_exists(name):
 
 
 def require_cmds(commands):
-    ok = True
+    return not missing_cmds(commands)
+
+
+def missing_cmds(commands):
+    missing = []
     for cmd in commands:
         if not command_exists(cmd):
             print(f"Missing required command: {cmd}", file=sys.stderr)
-            ok = False
-    return ok
+            missing.append(cmd)
+    return missing
 
 
 _docker_sudo = None
@@ -271,6 +278,8 @@ def _deep_merge(base, override):
 
 
 def load_config():
+    import yaml
+
     example = (
         yaml.safe_load((ROOT / "config.example.yml").read_text(encoding="utf-8")) or {}
     )
@@ -432,8 +441,29 @@ def virt_xml(
     return run([*libvirt_prefix(), *base], check=check, capture=capture)
 
 
+def remove_missing_removable_media(root):
+    """Drop stale installer media references that prevent a VM from starting."""
+    changed = False
+    devices = root.find("devices")
+    if devices is None:
+        return False
+
+    for disk in list(devices.findall("disk")):
+        if disk.get("device") not in {"cdrom", "floppy"}:
+            continue
+        source = disk.find("source")
+        if source is None:
+            continue
+        path = source.get("file") or source.get("dev")
+        if path and not Path(path).exists():
+            devices.remove(disk)
+            changed = True
+
+    return changed
+
+
 def set_domain_boot_to_disk(vm_name):
-    """Remove direct installer kernel boot and make the VM boot from disk."""
+    """Remove installer boot settings and stale media, then boot from disk."""
     dump = virsh(["dumpxml", "--inactive", vm_name], check=False, capture=True)
     if dump.returncode != 0:
         warn(f"Could not read inactive libvirt XML for {vm_name}.")
@@ -458,6 +488,7 @@ def set_domain_boot_to_disk(vm_name):
         os_node.remove(node)
 
     ET.SubElement(os_node, "boot", {"dev": "hd"})
+    changed = remove_missing_removable_media(root) or changed
     xml_text = ET.tostring(root, encoding="unicode")
 
     with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as handle:

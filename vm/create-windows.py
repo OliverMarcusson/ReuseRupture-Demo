@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S PYTHONPATH=. python3
 """vm/create-windows.py."""
 
 
-import sys
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 from xml.sax.saxutils import escape
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.rrlib import ROOT, cfg_path, download_url, info, load_config, ok, resolve_vm_resources, run, set_domain_boot_to_disk, set_domain_interface_model, stage_libvirt_media, step, virt_install, virsh, warn
 
 VIRTIO_DRIVER_SPECS = {
@@ -215,7 +213,11 @@ def main():
         bootstrap_path.write_text(bootstrap, encoding="utf-8")
         with NamedTemporaryFile(prefix="reuserupture-autounattend.", suffix=".iso", delete=False) as fh:
             answer_iso = Path(fh.name)
-        run(["xorriso", "-as", "mkisofs", "-quiet", "-J", "-r", "-V", "RRWINRM", "-o", str(answer_iso), answer_dir])
+        try:
+            run(["xorriso", "-as", "mkisofs", "-quiet", "-J", "-r", "-V", "RRWINRM", "-o", str(answer_iso), answer_dir])
+        except Exception:
+            answer_iso.unlink(missing_ok=True)
+            raise
     ok("Autounattend ISO generated")
 
     disk = Path(f"/var/lib/libvirt/images/{win['vm_name']}.qcow2")
@@ -251,7 +253,11 @@ def main():
         "--noautoconsole",
     ]
     step("Starting Windows installation")
-    virt_install(install_args)
+    try:
+        virt_install(install_args)
+    finally:
+        if answer_iso != staged_answer_iso:
+            answer_iso.unlink(missing_ok=True)
     ok("Windows installer launched")
     return 0
 
