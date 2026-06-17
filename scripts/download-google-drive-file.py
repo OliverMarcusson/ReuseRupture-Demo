@@ -135,23 +135,14 @@ def resolve_download_url(url_or_id: str) -> tuple[str, str]:
 def download(url_or_id: str, output: Path, expected_sha256: str = "") -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     resolved_url, file_id = resolve_download_url(url_or_id)
-    print(f"Downloading Google Drive file {file_id} to {output}", flush=True)
-    print(
-        "This file is several gigabytes and can take many minutes. "
-        "aria2 prints a progress summary every 5 seconds below.",
-        flush=True,
-    )
+    print(f"Downloading Google Drive file {file_id} to {output}")
     subprocess.run(
         [
             "aria2c",
             "--continue=true",
             "--max-connection-per-server=4",
             "--split=4",
-            # Emit a progress summary every 5s even when stdout is not a TTY
-            # (e.g. piped to a log), so the download never looks like a hang.
             "--summary-interval=5",
-            "--console-log-level=notice",
-            "--human-readable=true",
             "--dir",
             str(output.parent),
             "--out",
@@ -160,7 +151,6 @@ def download(url_or_id: str, output: Path, expected_sha256: str = "") -> None:
         ],
         check=True,
     )
-    print(f"Download complete: {output}", flush=True)
 
     if expected_sha256:
         actual = sha256(output)

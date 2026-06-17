@@ -80,21 +80,6 @@ On Debian systems using monolithic libvirt, this is usually:
 sudo systemctl enable --now libvirtd
 ```
 
-## Setup Looks Stuck After The Attacker Container
-
-The next step after the Docker attacker is building the lab VM, which downloads
-the multi-gigabyte Windows Server evaluation ISO. This is the longest step and
-can take many minutes on a slow connection. aria2 prints a progress summary
-every five seconds; if you piped setup output to a file, watch the partial file
-grow instead:
-
-```bash
-ls -lh iso/ server2025_eval.iso 2>/dev/null
-```
-
-To avoid the download entirely, point `windows.iso_path` at a local ISO and set
-`windows.download_iso: false` in `config.yml` before running setup.
-
 ## Windows ISO Path Errors
 
 If `windows.iso_path` exists, setup uses it and skips download. If it does not
