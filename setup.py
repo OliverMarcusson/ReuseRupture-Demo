@@ -34,34 +34,47 @@ REQUIRED_COMMANDS = [
 ]
 
 # Per-distro package sets, keyed by the package-manager binary we detect.
-# `update` runs first (optional); `install` is the install command prefix.
+# `update` runs first (optional); `install` is the install command prefix;
+# `available` is a read-only query (package name appended) whose exit code tells
+# us whether the package is installable on this system.
+#
+# A package entry is either a single name, or a tuple of alternatives in
+# preference order — the first installable name wins. Alternatives absorb the
+# package renames that happen across distro releases (for example
+# `freerdp2-x11` becoming `freerdp3-x11` on newer Ubuntu, or the transitional
+# `qemu-kvm` becoming `qemu-system-x86`).
 PACKAGE_MANAGERS = {
     "apt-get": {
         "label": "Debian/Ubuntu (apt)",
         "update": ["apt-get", "update"],
         "install": ["apt-get", "install", "-y"],
+        "available": ["apt-cache", "show"],
         "packages": [
             "ansible", "coreutils", "cpio", "curl", "docker.io",
-            "docker-compose-plugin", "freerdp2-x11", "gzip", "libvirt-clients",
+            ("docker-compose-v2", "docker-compose-plugin", "docker-compose"),
+            ("freerdp3-x11", "freerdp2-x11"), "gzip", "libvirt-clients",
             "libvirt-daemon-system", "python3", "python3-pip", "python3-winrm",
-            "python3-yaml", "qemu-kvm", "qemu-utils", "sshpass", "vagrant",
-            "vagrant-libvirt", "virtinst", "xorriso", "aria2",
+            "python3-yaml", ("qemu-system-x86", "qemu-kvm"), "qemu-utils",
+            "sshpass", "vagrant", "vagrant-libvirt", "virtinst", "xorriso",
+            "aria2",
         ],
     },
     "dnf": {
         "label": "Fedora (dnf)",
         "install": ["dnf", "install", "-y"],
+        "available": ["dnf", "list"],
         "packages": [
             "ansible", "coreutils", "cpio", "curl", "docker",
-            "docker-compose-plugin", "freerdp", "gzip", "libvirt", "python3",
-            "python3-pip", "python3-winrm", "python3-PyYAML", "qemu-img",
-            "qemu-kvm", "sshpass", "vagrant", "vagrant-libvirt", "virt-install",
-            "xorriso", "aria2",
+            ("docker-compose", "docker-compose-plugin"), "freerdp", "gzip",
+            "libvirt", "python3", "python3-pip", "python3-winrm",
+            "python3-PyYAML", "qemu-img", "qemu-kvm", "sshpass", "vagrant",
+            "vagrant-libvirt", "virt-install", "xorriso", "aria2",
         ],
     },
     "pacman": {
         "label": "Arch (pacman)",
         "install": ["pacman", "-S", "--needed", "--noconfirm"],
+        "available": ["pacman", "-Si"],
         "packages": [
             "ansible", "coreutils", "cpio", "curl", "docker", "docker-compose",
             "freerdp", "gzip", "libvirt", "libvirt-glib", "make", "gcc",
@@ -71,6 +84,33 @@ PACKAGE_MANAGERS = {
         ],
     },
 }
+
+
+def resolve_packages(spec: dict) -> tuple[list[str], list[str]]:
+    """Resolve the package list against what this package manager can install.
+
+    Returns ``(to_install, skipped)``. For tuple entries the first installable
+    alternative is chosen; entries with no installable candidate are reported as
+    skipped instead of aborting the whole install.
+    """
+    test = spec.get("available")
+    to_install: list[str] = []
+    skipped: list[str] = []
+    for entry in spec["packages"]:
+        candidates = [entry] if isinstance(entry, str) else list(entry)
+        if test is None:
+            to_install.append(candidates[0])
+            continue
+        chosen = next(
+            (c for c in candidates
+             if run([*test, c], check=False, capture=True).returncode == 0),
+            None,
+        )
+        if chosen is not None:
+            to_install.append(chosen)
+        else:
+            skipped.append("/".join(candidates))
+    return to_install, skipped
 
 
 def install_host_dependencies() -> None:
@@ -85,7 +125,20 @@ def install_host_dependencies() -> None:
         info(f"Installing host packages with {spec['label']}")
         if spec.get("update"):
             run(spec["update"], sudo=True)
-        run([*spec["install"], *spec["packages"]], sudo=True)
+
+        packages, skipped = resolve_packages(spec)
+        if skipped:
+            warn("Skipping packages not available in this distro's repositories: " + ", ".join(skipped))
+            warn("If a later step reports a missing tool, install the equivalent package manually.")
+
+        if packages and run([*spec["install"], *packages], sudo=True, check=False).returncode != 0:
+            warn("Batch package install failed; retrying packages individually.")
+            failed = [
+                pkg for pkg in packages
+                if run([*spec["install"], pkg], sudo=True, check=False).returncode != 0
+            ]
+            if failed:
+                warn("Packages that could not be installed: " + ", ".join(failed))
         break
     else:
         raise SystemExit(
@@ -93,8 +146,11 @@ def install_host_dependencies() -> None:
             "virt-install, Ansible, PyYAML, curl, xorriso, cpio, gzip."
         )
 
-    require_cmds(REQUIRED_COMMANDS)
-    ok("Host dependencies installed")
+    if require_cmds(REQUIRED_COMMANDS):
+        ok("Host dependencies installed")
+    else:
+        warn("Some required commands are still missing after package installation.")
+        warn("Install the equivalents for your distribution, then rerun ./setup.py.")
 
 
 def ensure_virtio_iso() -> None:
